@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("MEMBER") // ADMIN | MEMBER
+  avatarUrl String?
+  createdAt DateTime @default(now())
+
+  reportedIssues Issue[]      @relation("Reporter")
+  assignedIssues Issue[]      @relation("Assignee")
+  comments       Comment[]
+  deployments    Deployment[]
+  projects       Project[]
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  key         String   @unique
+  description String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  createdBy   User         @relation(fields: [createdById], references: [id])
+  issues      Issue[]
+  labels      Label[]
+  deployments Deployment[]
+}
+
+model Issue {
+  id          String   @id @default(uuid())
+  projectId   String
+  issueNumber Int
+  title       String
+  description String?
+  status      String   @default("TODO") // TODO | IN_PROGRESS | IN_REVIEW | DONE
+  priority    String   @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  assigneeId  String?
+  reporterId  String
+  kanbanOrder Int      @default(0)
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee User?     @relation("Assignee", fields: [assigneeId], references: [id])
+  reporter User      @relation("Reporter", fields: [reporterId], references: [id])
+  comments Comment[]
+  labels   Label[]   @relation("IssueLabels")
+
+  @@unique([projectId, issueNumber])
+}
+
+model Label {
+  id        String @id @default(uuid())
+  projectId String
+  name      String
+  color     String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues  Issue[] @relation("IssueLabels")
+
+  @@unique([projectId, name])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  issueId   String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  issue  Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id])
+}
+
+model Deployment {
+  id          String   @id @default(uuid())
+  projectId   String
+  version     String
+  environment String // DEV | STAGING | PROD
+  status      String   @default("PENDING") // PENDING | IN_PROGRESS | SUCCESS | FAILED | ROLLED_BACK
+  description String?
+  changes     String?
+  deployedById String
+  deployedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deployedBy User    @relation(fields: [deployedById], references: [id])
+}
