@@ -44,18 +44,25 @@ export async function PATCH(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+  if (!user || user.role !== "ADMIN") {
+    return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   }
 
   const { projectId } = await params;
+
+  const existing = await prisma.project.findFirst({
+    where: { OR: [{ id: projectId }, { key: projectId }] },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "프로젝트를 찾을 수 없습니다." }, { status: 404 });
+  }
 
   try {
     const body = await request.json();
     const data = updateSchema.parse(body);
 
     const project = await prisma.project.update({
-      where: { id: projectId },
+      where: { id: existing.id },
       data,
     });
 
@@ -79,7 +86,17 @@ export async function DELETE(
 
   const { projectId } = await params;
 
-  await prisma.project.delete({ where: { id: projectId } });
+  const existing = await prisma.project.findFirst({
+    where: { OR: [{ id: projectId }, { key: projectId }] },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "프로젝트를 찾을 수 없습니다." }, { status: 404 });
+  }
 
-  return NextResponse.json({ success: true });
+  try {
+    await prisma.project.delete({ where: { id: existing.id } });
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+  }
 }

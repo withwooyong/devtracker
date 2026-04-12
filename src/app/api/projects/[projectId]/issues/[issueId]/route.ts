@@ -21,12 +21,16 @@ export async function GET(_request: NextRequest, { params }: Params) {
   }
 
   const issueNumber = parseInt(issueId);
-  const where = isNaN(issueNumber)
-    ? { id: issueId }
-    : { projectId_issueNumber: { projectId: project.id, issueNumber } };
+  const target = isNaN(issueNumber)
+    ? await prisma.issue.findFirst({ where: { id: issueId, projectId: project.id } })
+    : await prisma.issue.findUnique({ where: { projectId_issueNumber: { projectId: project.id, issueNumber } } });
+
+  if (!target) {
+    return NextResponse.json({ error: "이슈를 찾을 수 없습니다." }, { status: 404 });
+  }
 
   const issue = await prisma.issue.findUnique({
-    where,
+    where: { id: target.id },
     include: {
       assignee: {
         select: { id: true, name: true, email: true, avatarUrl: true },
@@ -84,12 +88,16 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const { labelIds, ...data } = updateSchema.parse(body);
 
     const issueNumber = parseInt(issueId);
-    const where = isNaN(issueNumber)
-      ? { id: issueId }
-      : { projectId_issueNumber: { projectId: project.id, issueNumber } };
+    const existingIssue = isNaN(issueNumber)
+      ? await prisma.issue.findFirst({ where: { id: issueId, projectId: project.id } })
+      : await prisma.issue.findUnique({ where: { projectId_issueNumber: { projectId: project.id, issueNumber } } });
+
+    if (!existingIssue) {
+      return NextResponse.json({ error: "이슈를 찾을 수 없습니다." }, { status: 404 });
+    }
 
     const issue = await prisma.issue.update({
-      where,
+      where: { id: existingIssue.id },
       data: {
         ...data,
         dueDate: data.dueDate === null ? null : data.dueDate ? new Date(data.dueDate) : undefined,
@@ -123,9 +131,26 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
 
-  const { issueId } = await params;
+  const { projectId, issueId } = await params;
 
-  await prisma.issue.delete({ where: { id: issueId } });
+  const project = await prisma.project.findFirst({
+    where: { OR: [{ id: projectId }, { key: projectId }] },
+  });
+  if (!project) {
+    return NextResponse.json({ error: "프로젝트 없음" }, { status: 404 });
+  }
 
-  return NextResponse.json({ success: true });
+  const issue = await prisma.issue.findFirst({
+    where: { id: issueId, projectId: project.id },
+  });
+  if (!issue) {
+    return NextResponse.json({ error: "이슈를 찾을 수 없습니다." }, { status: 404 });
+  }
+
+  try {
+    await prisma.issue.delete({ where: { id: issue.id } });
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+  }
 }

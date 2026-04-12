@@ -15,7 +15,7 @@ export default function ProjectsPage() {
 
   const { data, isLoading } = useQuery<{ projects: Project[] }>({
     queryKey: ["projects"],
-    queryFn: () => fetch("/api/projects").then((r) => r.json()),
+    queryFn: () => fetch("/api/projects").then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
   });
 
   const createMutation = useMutation({

@@ -16,8 +16,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   setLoading: (isLoading) => set({ isLoading }),
   logout: () => {
     set({ user: null, isLoading: false });
-    fetch("/api/auth/logout", { method: "POST" }).then(() => {
-      window.location.href = "/login";
-    });
+    fetch("/api/auth/logout", { method: "POST" })
+      .catch(() => {})
+      .finally(() => {
+        window.location.href = "/login";
+      });
   },
 }));

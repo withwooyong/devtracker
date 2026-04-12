@@ -25,13 +25,13 @@ export default function NewIssuePage({
 
   const { data: usersData } = useQuery<{ users: User[] }>({
     queryKey: ["users"],
-    queryFn: () => fetch("/api/users").then((r) => r.json()),
+    queryFn: () => fetch("/api/users").then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
   });
 
   const { data: labelsData } = useQuery<{ labels: Label[] }>({
     queryKey: ["labels", projectKey],
     queryFn: () =>
-      fetch(`/api/projects/${projectKey}/labels`).then((r) => r.json()),
+      fetch(`/api/projects/${projectKey}/labels`).then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
   });
 
   const createMutation = useMutation({

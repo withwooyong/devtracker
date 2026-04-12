@@ -20,12 +20,12 @@ export default function ProjectIssuePage({
 
   const { data: projectData } = useQuery<{ project: { id: string; name: string; key: string } }>({
     queryKey: ["project", projectKey],
-    queryFn: () => fetch(`/api/projects/${projectKey}`).then((r) => r.json()),
+    queryFn: () => fetch(`/api/projects/${projectKey}`).then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
   });
 
   const { data: usersData } = useQuery<{ users: User[] }>({
     queryKey: ["users"],
-    queryFn: () => fetch("/api/users").then((r) => r.json()),
+    queryFn: () => fetch("/api/users").then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
   });
 
   const queryParams = new URLSearchParams();
@@ -37,7 +37,7 @@ export default function ProjectIssuePage({
   const { data, isLoading } = useQuery<{ issues: Issue[]; total: number }>({
     queryKey: ["issues", projectKey, status, priority, assigneeId, search],
     queryFn: () =>
-      fetch(`/api/projects/${projectKey}/issues?${queryParams}`).then((r) => r.json()),
+      fetch(`/api/projects/${projectKey}/issues?${queryParams}`).then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
   });
 
   return (

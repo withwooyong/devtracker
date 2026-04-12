@@ -13,10 +13,24 @@ export async function GET(_request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
 
-  const { issueId } = await params;
+  const { projectId, issueId } = await params;
+
+  const project = await prisma.project.findFirst({
+    where: { OR: [{ id: projectId }, { key: projectId }] },
+  });
+  if (!project) {
+    return NextResponse.json({ error: "프로젝트 없음" }, { status: 404 });
+  }
+
+  const issue = await prisma.issue.findFirst({
+    where: { id: issueId, projectId: project.id },
+  });
+  if (!issue) {
+    return NextResponse.json({ error: "이슈를 찾을 수 없습니다." }, { status: 404 });
+  }
 
   const comments = await prisma.comment.findMany({
-    where: { issueId },
+    where: { issueId: issue.id },
     include: {
       author: {
         select: { id: true, name: true, email: true, avatarUrl: true },
@@ -38,7 +52,21 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
 
-  const { issueId } = await params;
+  const { projectId, issueId } = await params;
+
+  const project = await prisma.project.findFirst({
+    where: { OR: [{ id: projectId }, { key: projectId }] },
+  });
+  if (!project) {
+    return NextResponse.json({ error: "프로젝트 없음" }, { status: 404 });
+  }
+
+  const issue = await prisma.issue.findFirst({
+    where: { id: issueId, projectId: project.id },
+  });
+  if (!issue) {
+    return NextResponse.json({ error: "이슈를 찾을 수 없습니다." }, { status: 404 });
+  }
 
   try {
     const body = await request.json();
@@ -47,7 +75,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const comment = await prisma.comment.create({
       data: {
         content,
-        issueId,
+        issueId: issue.id,
         authorId: user.userId,
       },
       include: {

@@ -142,15 +142,16 @@ export default function BoardPage({
     project: { id: string; name: string };
   }>({
     queryKey: ["project", projectKey],
-    queryFn: () => fetch(`/api/projects/${projectKey}`).then((r) => r.json()),
+    queryFn: () => fetch(`/api/projects/${projectKey}`).then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
   });
 
   const { data, isLoading } = useQuery<{ issues: Issue[] }>({
     queryKey: ["issues", projectKey, "board"],
     queryFn: () =>
-      fetch(`/api/projects/${projectKey}/issues?limit=200`).then((r) =>
-        r.json()
-      ),
+      fetch(`/api/projects/${projectKey}/issues?limit=100`).then((r) => {
+        if (!r.ok) throw new Error("fetch failed");
+        return r.json();
+      }),
   });
 
   const boardMutation = useMutation({

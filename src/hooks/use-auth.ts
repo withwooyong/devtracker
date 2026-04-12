@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 
 export function useAuth() {
   const { user, isLoading, setUser } = useAuthStore();
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
-    if (user) return;
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
 
     fetch("/api/auth/me")
       .then((res) => {
@@ -16,7 +18,7 @@ export function useAuth() {
       })
       .then((data) => setUser(data.user))
       .catch(() => setUser(null));
-  }, [user, setUser]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { user, isLoading };
 }

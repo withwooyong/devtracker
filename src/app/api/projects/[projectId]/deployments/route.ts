@@ -21,8 +21,11 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "프로젝트 없음" }, { status: 404 });
   }
 
+  const VALID_ENVS = ["DEV", "STAGING", "PROD"] as const;
   const where: Record<string, unknown> = { projectId: project.id };
-  if (env && env !== "ALL") where.environment = env;
+  if (env && env !== "ALL" && VALID_ENVS.includes(env as (typeof VALID_ENVS)[number])) {
+    where.environment = env;
+  }
 
   const deployments = await prisma.deployment.findMany({
     where,
@@ -62,6 +65,11 @@ export async function POST(request: NextRequest, { params }: Params) {
   try {
     const body = await request.json();
     const data = createSchema.parse(body);
+
+    // PROD 배포 생성은 ADMIN만 가능
+    if (data.environment === "PROD" && user.role !== "ADMIN") {
+      return NextResponse.json({ error: "운영 배포는 관리자만 생성할 수 있습니다." }, { status: 403 });
+    }
 
     const deployment = await prisma.deployment.create({
       data: {

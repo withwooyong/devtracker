@@ -22,7 +22,7 @@ export default function DeploymentsPage({
     project: { id: string; name: string };
   }>({
     queryKey: ["project", projectKey],
-    queryFn: () => fetch(`/api/projects/${projectKey}`).then((r) => r.json()),
+    queryFn: () => fetch(`/api/projects/${projectKey}`).then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
   });
 
   const queryParams = envFilter !== "ALL" ? `?environment=${envFilter}` : "";

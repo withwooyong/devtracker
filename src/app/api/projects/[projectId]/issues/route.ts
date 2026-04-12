@@ -18,8 +18,10 @@ export async function GET(
   const priority = url.searchParams.get("priority");
   const assigneeId = url.searchParams.get("assigneeId");
   const search = url.searchParams.get("search");
-  const page = parseInt(url.searchParams.get("page") || "1");
-  const limit = parseInt(url.searchParams.get("limit") || "50");
+  const rawPage = parseInt(url.searchParams.get("page") || "1", 10);
+  const rawLimit = parseInt(url.searchParams.get("limit") || "50", 10);
+  const page = isNaN(rawPage) || rawPage < 1 ? 1 : rawPage;
+  const limit = isNaN(rawLimit) || rawLimit < 1 ? 50 : Math.min(rawLimit, 100);
 
   const project = await prisma.project.findFirst({
     where: { OR: [{ id: projectId }, { key: projectId }] },
@@ -105,41 +107,42 @@ export async function POST(
     const body = await request.json();
     const { labelIds, ...data } = createSchema.parse(body);
 
-    // Get next issue number
-    const lastIssue = await prisma.issue.findFirst({
-      where: { projectId: project.id },
-      orderBy: { issueNumber: "desc" },
-    });
-    const issueNumber = (lastIssue?.issueNumber ?? 0) + 1;
+    // 트랜잭션으로 issue 번호 생성 race condition 방지
+    const issue = await prisma.$transaction(async (tx) => {
+      const lastIssue = await tx.issue.findFirst({
+        where: { projectId: project.id },
+        orderBy: { issueNumber: "desc" },
+      });
+      const issueNumber = (lastIssue?.issueNumber ?? 0) + 1;
 
-    // Get max kanban order for the status
-    const lastKanban = await prisma.issue.findFirst({
-      where: { projectId: project.id, status: data.status },
-      orderBy: { kanbanOrder: "desc" },
-    });
-    const kanbanOrder = (lastKanban?.kanbanOrder ?? -1) + 1;
+      const lastKanban = await tx.issue.findFirst({
+        where: { projectId: project.id, status: data.status },
+        orderBy: { kanbanOrder: "desc" },
+      });
+      const kanbanOrder = (lastKanban?.kanbanOrder ?? -1) + 1;
 
-    const issue = await prisma.issue.create({
-      data: {
-        ...data,
-        projectId: project.id,
-        issueNumber,
-        reporterId: user.userId,
-        kanbanOrder,
-        dueDate: data.dueDate ? new Date(data.dueDate) : null,
-        ...(labelIds?.length
-          ? { labels: { connect: labelIds.map((id) => ({ id })) } }
-          : {}),
-      },
-      include: {
-        assignee: {
-          select: { id: true, name: true, email: true, avatarUrl: true },
+      return tx.issue.create({
+        data: {
+          ...data,
+          projectId: project.id,
+          issueNumber,
+          reporterId: user.userId,
+          kanbanOrder,
+          dueDate: data.dueDate ? new Date(data.dueDate) : null,
+          ...(labelIds?.length
+            ? { labels: { connect: labelIds.map((id) => ({ id })) } }
+            : {}),
         },
-        reporter: {
-          select: { id: true, name: true, email: true, avatarUrl: true },
+        include: {
+          assignee: {
+            select: { id: true, name: true, email: true, avatarUrl: true },
+          },
+          reporter: {
+            select: { id: true, name: true, email: true, avatarUrl: true },
+          },
+          labels: true,
         },
-        labels: true,
-      },
+      });
     });
 
     return NextResponse.json({ issue }, { status: 201 });

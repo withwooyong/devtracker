@@ -2,8 +2,14 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "fallback-refresh";
+function getSecret(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`환경변수 ${name}이(가) 설정되지 않았습니다.`);
+  return value;
+}
+
+function getJwtSecret() { return getSecret("JWT_SECRET"); }
+function getRefreshSecret() { return getSecret("JWT_REFRESH_SECRET"); }
 
 export interface JwtPayload {
   userId: string;
@@ -23,16 +29,27 @@ export async function verifyPassword(
 }
 
 export function generateAccessToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: "15m" });
 }
 
 export function generateRefreshToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: "7d" });
+  return jwt.sign(payload, getRefreshSecret(), { expiresIn: "7d" });
+}
+
+function isJwtPayload(value: unknown): value is JwtPayload {
+  if (typeof value !== "object" || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.userId === "string" &&
+    typeof obj.email === "string" &&
+    typeof obj.role === "string"
+  );
 }
 
 export function verifyAccessToken(token: string): JwtPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, getJwtSecret());
+    return isJwtPayload(decoded) ? decoded : null;
   } catch {
     return null;
   }
@@ -40,7 +57,8 @@ export function verifyAccessToken(token: string): JwtPayload | null {
 
 export function verifyRefreshToken(token: string): JwtPayload | null {
   try {
-    return jwt.verify(token, JWT_REFRESH_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, getRefreshSecret());
+    return isJwtPayload(decoded) ? decoded : null;
   } catch {
     return null;
   }

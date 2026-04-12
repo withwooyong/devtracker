@@ -22,13 +22,30 @@ export async function PATCH(
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
 
-  await params; // validate route
+  const { projectId } = await params;
+
+  const project = await prisma.project.findFirst({
+    where: { OR: [{ id: projectId }, { key: projectId }] },
+  });
+  if (!project) {
+    return NextResponse.json({ error: "프로젝트 없음" }, { status: 404 });
+  }
 
   try {
     const body = await request.json();
     const { items } = updateSchema.parse(body);
 
-    await Promise.all(
+    // 모든 이슈가 해당 프로젝트 소속인지 검증
+    const issueIds = items.map((item) => item.id);
+    const issues = await prisma.issue.findMany({
+      where: { id: { in: issueIds }, projectId: project.id },
+      select: { id: true },
+    });
+    if (issues.length !== issueIds.length) {
+      return NextResponse.json({ error: "유효하지 않은 이슈가 포함되어 있습니다." }, { status: 400 });
+    }
+
+    await prisma.$transaction(
       items.map((item) =>
         prisma.issue.update({
           where: { id: item.id },

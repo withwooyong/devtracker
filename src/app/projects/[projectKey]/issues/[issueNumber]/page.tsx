@@ -30,7 +30,7 @@ export default function IssueDetailPage({
 
   const { data: usersData } = useQuery<{ users: User[] }>({
     queryKey: ["users"],
-    queryFn: () => fetch("/api/users").then((r) => r.json()),
+    queryFn: () => fetch("/api/users").then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
   });
 
   const updateMutation = useMutation({
@@ -39,7 +39,7 @@ export default function IssueDetailPage({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-      }).then((r) => r.json()),
+      }).then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["issue", projectKey, issueNumber],
@@ -57,7 +57,7 @@ export default function IssueDetailPage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content }),
         }
-      ).then((r) => r.json()),
+      ).then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["issue", projectKey, issueNumber],

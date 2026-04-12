@@ -1,46 +1,33 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import jwt from "jsonwebtoken";
+import { verifyAccessToken, verifyRefreshToken } from "@/lib/auth";
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";
-const JWT_REFRESH_SECRET =
-  process.env.JWT_REFRESH_SECRET || "fallback-refresh";
+const PUBLIC_PATHS = ["/login", "/api/auth", "/_next", "/favicon"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Public paths
-  if (
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon")
-  ) {
+  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
   const accessToken = request.cookies.get("access_token")?.value;
   const refreshToken = request.cookies.get("refresh_token")?.value;
 
-  if (accessToken) {
-    try {
-      jwt.verify(accessToken, JWT_SECRET);
-      return NextResponse.next();
-    } catch {
-      // Access token invalid/expired
+  try {
+    if (accessToken) {
+      const payload = verifyAccessToken(accessToken);
+      if (payload) return NextResponse.next();
     }
+
+    if (refreshToken) {
+      const payload = verifyRefreshToken(refreshToken);
+      if (payload) return NextResponse.next();
+    }
+  } catch {
+    // env 변수 미설정 등 — 인증 실패로 처리
   }
 
-  if (refreshToken) {
-    try {
-      jwt.verify(refreshToken, JWT_REFRESH_SECRET);
-      return NextResponse.next();
-    } catch {
-      // Refresh token also invalid
-    }
-  }
-
-  // Not authenticated
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
