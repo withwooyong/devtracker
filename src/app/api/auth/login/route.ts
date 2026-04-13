@@ -51,8 +51,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    const message = error instanceof Error ? error.message : "서버 오류가 발생했습니다.";
     return NextResponse.json(
-      { error: "서버 오류가 발생했습니다." },
+      { error: message },
       { status: 500 }
     );
   }
