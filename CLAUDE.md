@@ -16,14 +16,15 @@ pnpm dev              # 개발 서버 (http://localhost:3000)
 pnpm build            # 프로덕션 빌드
 pnpm lint             # ESLint
 npx prisma generate   # Prisma 클라이언트 생성 (스키마 변경 후 필수)
-npx prisma db push    # 스키마를 DB에 반영 (migration 없이)
-npx tsx prisma/seed.ts  # 시드 데이터 삽입 (모든 계정 비밀번호: yanadoo123)
+npx prisma db push --url "file:./prisma/dev.db"  # 로컬 SQLite에 스키마 반영
+sqlite3 prisma/dev.db .dump | turso db shell devtracker  # Turso에 스키마 적용
+TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... npx tsx prisma/seed.ts  # 시드 데이터
 ```
 
 ## Tech Stack
 
 - **Next.js 16** + React 19, TypeScript, Tailwind CSS v4
-- **Prisma 7** with **better-sqlite3** adapter (DB 파일: `prisma/dev.db`)
+- **Prisma 7** with **Turso (libSQL)** adapter — 클라우드 SQLite
 - **pnpm** 패키지 매니저
 - Client state: **Zustand** / Server state: **TanStack React Query**
 - Form: react-hook-form + zod, Auth: jsonwebtoken + bcryptjs
@@ -37,10 +38,11 @@ JWT 기반 인증. httpOnly 쿠키에 access token(15분) + refresh token(7일) 
 - 모든 API route handler에서 `getCurrentUser()`로 인증 확인
 - 클라이언트: `useAuthStore` (Zustand) + `useAuth` hook이 `/api/auth/me`로 세션 확인
 
-### Prisma (SQLite)
-- `src/lib/prisma.ts` — PrismaBetterSqlite3 어댑터로 직접 연결 (DATABASE_URL 미사용)
-- DB 경로는 `path.join(process.cwd(), "prisma", "dev.db")`로 결정됨
-- `prisma/prisma.config.ts` — Prisma CLI 설정
+### Prisma (Turso/libSQL)
+- `src/lib/prisma.ts` — `PrismaLibSql` 어댑터로 Turso 클라우드 DB 연결
+- 환경변수: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (`.env.local`)
+- 스키마 적용: `npx prisma db push --url "file:./prisma/dev.db"` 후 `turso db shell devtracker < dump.sql`
+- `prisma/prisma.config.ts` — Prisma CLI 설정 (schema 경로만)
 
 ### API Routes
 REST API 패턴: `/api/projects/[projectId]/issues/[issueId]/comments`

@@ -1,91 +1,65 @@
 # Session Handoff
 
-> Last updated: 2026-04-12 (KST)
+> Last updated: 2026-04-13 (KST)
 > Branch: `main`
-> Latest commit: `ae582c6` - DevTracker 초기 구현: 개발 업무/배포 관리 시스템
+> Latest commit: `aa53edc` - 보안 강화 및 코드리뷰 반영: 인가 체크, IDOR 방지, E2E 테스트
 
 ## Current Status
 
-보안 강화 + 코드리뷰 반영 작업 완료. 코드리뷰 2라운드 통과 (CRITICAL 0, HIGH 0), TypeScript 컴파일 성공, E2E 테스트 7/7 통과. **아직 커밋/푸시되지 않은 상태.**
+Turso(libSQL) 마이그레이션 완료. 로컬 SQLite(better-sqlite3) → Turso 클라우드 DB 전환. 로컬 검증 통과 (로그인/API/proxy 동작 확인). **커밋/푸시 대기 상태.** Vercel 배포는 미진행.
 
 ## Completed This Session
 
 | # | Task | Files |
 |---|------|-------|
-| 1 | JWT secret fallback 제거 + 환경변수 필수화 | `src/lib/auth.ts` |
-| 2 | proxy.ts 재작성 (auth.ts import, try/catch) | `src/proxy.ts` |
-| 3 | 모든 API route 인가 체크 + projectId 범위 검증 | 7개 API route 파일 |
-| 4 | Issue 번호 생성 race condition 해결 ($transaction) | `issues/route.ts` |
-| 5 | Board 일괄 업데이트 $transaction + 프로젝트 소속 검증 | `board/route.ts` |
-| 6 | useAuth 무한 루프 수정 | `src/hooks/use-auth.ts` |
-| 7 | 보안 헤더 + limit 상한 + queryFn ok 체크 | `next.config.ts`, 7개 페이지 |
-| 8 | error.tsx, not-found.tsx, logout catch, 상수 중복 제거 | 4개 파일 |
-| 9 | E2E 테스트 7개 작성 (Playwright) | `tests/e2e/`, `playwright.config.ts` |
-| 10 | 문서 작성 (PLAN.md, ted-run-guide, e2e-guide, CLAUDE.md) | `docs/`, `CLAUDE.md` |
+| 1 | Turso DB 생성 (aws-ap-northeast-1) | CLI |
+| 2 | 의존성 교체: better-sqlite3 → @prisma/adapter-libsql | `package.json` |
+| 3 | Prisma 어댑터 교체 (factory 패턴) | `src/lib/prisma.ts`, `prisma/seed.ts` |
+| 4 | Turso에 스키마 적용 + 시드 데이터 삽입 | CLI |
+| 5 | 로컬 검증 (로그인, API, proxy) | 수동 테스트 |
+| 6 | CLAUDE.md, CHANGELOG.md 현행화 | `CLAUDE.md`, `CHANGELOG.md` |
+| 7 | 마이그레이션 작업계획서 작성 | `docs/turso-vercel-migration-plan.md` |
 
 ## In Progress / Pending
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 1 | 커밋 및 푸시 | 대기 | 사용자 확인 후 진행 |
+| 1 | 커밋/푸시 | 대기 | 사용자 확인 후 진행 |
+| 2 | Vercel 배포 | 미시작 | vercel link → env 설정 → deploy |
 
 ## Key Decisions Made
 
-- **Next.js 16 proxy.ts**: `middleware.ts` deprecated → `proxy.ts`가 공식 파일 컨벤션. 함수명도 `proxy`로 export
-- **JWT secret lazy evaluation**: 빌드 시점에 환경변수 없으면 에러 발생 방지를 위해 `getJwtSecret()` 함수 호출 방식으로 변경
-- **Deployment 권한**: PROD 배포 생성은 ADMIN만. Deployment PATCH(상태 변경)도 ADMIN만. DEV/STAGING 배포는 MEMBER 허용
-- **proxy.ts에서 Prisma 대신 auth.ts import**: 미들웨어에서 직접 DB 접근 대신 JWT 토큰 검증 함수만 사용
-- **useAuth**: 빈 deps 배열 + useRef로 컴포넌트 마운트당 1회만 fetch. 로그아웃 시 페이지 리다이렉트로 컴포넌트 언마운트
+- **Prisma 7 adapter-libsql factory 패턴**: `PrismaLibSql({url, authToken})` — Prisma 7에서는 createClient를 어댑터 내부에서 호출. 직접 `@libsql/client` import 불필요
+- **스키마 적용 방식**: Prisma CLI가 `libsql://` 프로토콜 미지원 → 로컬 SQLite에 `db push` 후 `.dump` → `turso db shell`로 적용
+- **prisma.config.ts**: datasource URL 제거 (Prisma 7에서 런타임 URL 충돌 방지). CLI에서는 `--url` 옵션으로 전달
 
 ## Known Issues
 
-- **Prisma + Turbopack 빌드 에러**: `pnpm build`가 `@prisma/client-runtime-utils` 모듈 로딩 실패로 실패. `pnpm dev`는 정상 동작. Prisma 7 + Next.js 16 Turbopack 호환성 문제로 추정
-- **코드리뷰 MEDIUM 미수정 건**: 프로젝트 생성(POST /api/projects)에 ADMIN 체크 없음 (의도적), 404 에러 메시지 불일치("프로젝트 없음" vs "프로젝트를 찾을 수 없습니다."), CSP 헤더 미설정
-- **react-hook-form 미사용**: 의존성 설치되어 있으나 모든 폼이 useState로 구현. Zod 클라이언트 검증 없음
-- **Board 100개 제한**: limit=100으로 캡. 이슈 100개 초과 프로젝트에서 불완전한 보드 표시 가능
-- **Refresh token 서버 측 무효화 불가**: 로그아웃해도 토큰 7일간 유효
+- **Prisma CLI `libsql://` 미지원**: `prisma db push`가 libSQL URL을 인식하지 못함. 스키마 변경 시 로컬 SQLite → dump → turso shell 우회 필요
+- **Vercel 배포 미완**: 환경변수 설정 + 배포 필요
+- **Prisma + Turbopack 빌드 에러**: `pnpm build`가 여전히 실패 (`@prisma/client-runtime-utils`). dev 서버는 정상
+- 이전 세션 Known Issues 유지 (코드리뷰 MEDIUM 건, react-hook-form 미사용, Board 100개 제한 등)
 
 ## Context for Next Session
 
-- 사용자(Ted)는 야나두 개발팀의 Jira 대안 시스템을 구축 중
-- 이번 세션에서 코드리뷰 기반 보안 강화를 완료. 커밋/푸시 대기 상태
+- 사용자(Ted)는 야나두 개발팀의 Jira 대안 시스템을 Vercel에 배포하려 함
+- Turso DB 생성 완료, 시드 데이터 적재 완료, 로컬 검증 통과
+- **다음 단계: Vercel 배포** (`vercel link` → 환경변수 4개 설정 → `vercel --prod`)
+- 환경변수: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `JWT_SECRET`, `JWT_REFRESH_SECRET`
+- Turso DB URL: `libsql://devtracker-withwooyong.aws-ap-northeast-1.turso.io`
 - GitHub 레포: `withwooyong/devtracker`
-- 시드 데이터 비밀번호: `yanadoo123` (모든 계정 동일)
-- ADMIN 계정: `withwooyong@yanadoocorp.com` (Ted)
+- ADMIN 계정: `withwooyong@yanadoocorp.com` / 비밀번호: `yanadoo123`
 
 ## Files Modified This Session
 
 ```
  CLAUDE.md
- CHANGELOG.md (new)
- HANDOFF.md (new)
- next.config.ts
+ CHANGELOG.md
+ HANDOFF.md
  package.json
  pnpm-lock.yaml
- docs/PLAN.md (new)
- docs/ted-run-guide.md (new)
- docs/e2e-testing-guide.md (new)
- playwright.config.ts (new)
- src/app/error.tsx (new)
- src/app/not-found.tsx (new)
- src/proxy.ts
- src/lib/auth.ts
- src/hooks/use-auth.ts
- src/stores/auth-store.ts
- src/components/common/status-badge.tsx
- src/app/api/projects/[projectId]/route.ts
- src/app/api/projects/[projectId]/board/route.ts
- src/app/api/projects/[projectId]/issues/route.ts
- src/app/api/projects/[projectId]/issues/[issueId]/route.ts
- src/app/api/projects/[projectId]/issues/[issueId]/comments/route.ts
- src/app/api/projects/[projectId]/deployments/route.ts
- src/app/api/projects/[projectId]/deployments/[deploymentId]/route.ts
- src/app/dashboard/page.tsx
- src/app/projects/page.tsx
- src/app/projects/[projectKey]/page.tsx
- src/app/projects/[projectKey]/board/page.tsx
- src/app/projects/[projectKey]/deployments/page.tsx
- src/app/projects/[projectKey]/issues/new/page.tsx
- src/app/projects/[projectKey]/issues/[issueNumber]/page.tsx
- tests/e2e/ (new, 6 files)
+ prisma/prisma.config.ts
+ prisma/seed.ts
+ src/lib/prisma.ts
+ docs/turso-vercel-migration-plan.md (new)
 ```

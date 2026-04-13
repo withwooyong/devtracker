@@ -3,6 +3,21 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-13] Turso(libSQL) 마이그레이션
+
+### Changed
+- DB를 로컬 SQLite(better-sqlite3) → Turso 클라우드(libSQL)로 전환
+- `src/lib/prisma.ts` — `PrismaLibSql` factory 패턴으로 어댑터 교체
+- `prisma/seed.ts` — Turso 어댑터로 시드 데이터 삽입
+- `prisma/prisma.config.ts` — datasource URL 제거 (schema 경로만 유지)
+- `CLAUDE.md` — Turso 관련 명령어/아키텍처 업데이트
+
+### Removed
+- `@prisma/adapter-better-sqlite3`, `better-sqlite3` 의존성 제거
+- `@libsql/client` 직접 의존성 제거 (어댑터가 내부 포함)
+
+---
+
 ## [2026-04-12] 보안 강화 및 코드리뷰 반영
 
 ### Added
