@@ -22,12 +22,6 @@ export interface Deployment {
   deployedBy?: User;
 }
 
-export const ENV_LABELS: Record<DeployEnvironment, string> = {
-  DEV: "개발",
-  STAGING: "스테이징",
-  PROD: "운영",
-};
-
 export const DEPLOY_STATUS_LABELS: Record<DeployStatus, string> = {
   PENDING: "대기",
   IN_PROGRESS: "진행 중",

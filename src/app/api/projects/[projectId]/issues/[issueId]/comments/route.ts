@@ -85,6 +85,14 @@ export async function POST(request: NextRequest, { params }: Params) {
       },
     });
 
+    await prisma.activity.create({
+      data: {
+        issueId: issue.id,
+        userId: user.userId,
+        action: "COMMENT_ADDED",
+      },
+    });
+
     return NextResponse.json({ comment }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

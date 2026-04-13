@@ -145,6 +145,14 @@ export async function POST(
       });
     });
 
+    await prisma.activity.create({
+      data: {
+        issueId: issue.id,
+        userId: user.userId,
+        action: "CREATED",
+      },
+    });
+
     return NextResponse.json({ issue }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

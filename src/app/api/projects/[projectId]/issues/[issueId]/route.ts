@@ -89,8 +89,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const issueNumber = parseInt(issueId);
     const existingIssue = isNaN(issueNumber)
-      ? await prisma.issue.findFirst({ where: { id: issueId, projectId: project.id } })
-      : await prisma.issue.findUnique({ where: { projectId_issueNumber: { projectId: project.id, issueNumber } } });
+      ? await prisma.issue.findFirst({
+          where: { id: issueId, projectId: project.id },
+          include: { labels: { select: { id: true } } },
+        })
+      : await prisma.issue.findUnique({
+          where: { projectId_issueNumber: { projectId: project.id, issueNumber } },
+          include: { labels: { select: { id: true } } },
+        });
 
     if (!existingIssue) {
       return NextResponse.json({ error: "이슈를 찾을 수 없습니다." }, { status: 404 });
@@ -115,6 +121,82 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         labels: true,
       },
     });
+
+    // Build activity records for changed fields
+    const activityData: {
+      issueId: string;
+      userId: string;
+      action: string;
+      field?: string;
+      oldValue?: string | null;
+      newValue?: string | null;
+    }[] = [];
+
+    if (data.status !== undefined && data.status !== existingIssue.status) {
+      activityData.push({
+        issueId: existingIssue.id,
+        userId: user.userId,
+        action: "STATUS_CHANGED",
+        field: "status",
+        oldValue: existingIssue.status,
+        newValue: data.status,
+      });
+    }
+
+    if (data.priority !== undefined && data.priority !== existingIssue.priority) {
+      activityData.push({
+        issueId: existingIssue.id,
+        userId: user.userId,
+        action: "PRIORITY_CHANGED",
+        field: "priority",
+        oldValue: existingIssue.priority,
+        newValue: data.priority,
+      });
+    }
+
+    if ("assigneeId" in data && data.assigneeId !== existingIssue.assigneeId) {
+      activityData.push({
+        issueId: existingIssue.id,
+        userId: user.userId,
+        action: "ASSIGNEE_CHANGED",
+        field: "assigneeId",
+        oldValue: existingIssue.assigneeId ?? null,
+        newValue: data.assigneeId ?? null,
+      });
+    }
+
+    if (labelIds !== undefined) {
+      const existingLabelIds = new Set(existingIssue.labels.map((l) => l.id));
+      const newLabelIds = new Set(labelIds);
+
+      for (const id of newLabelIds) {
+        if (!existingLabelIds.has(id)) {
+          activityData.push({
+            issueId: existingIssue.id,
+            userId: user.userId,
+            action: "LABEL_ADDED",
+            field: "labelIds",
+            newValue: id,
+          });
+        }
+      }
+
+      for (const id of existingLabelIds) {
+        if (!newLabelIds.has(id)) {
+          activityData.push({
+            issueId: existingIssue.id,
+            userId: user.userId,
+            action: "LABEL_REMOVED",
+            field: "labelIds",
+            oldValue: id,
+          });
+        }
+      }
+    }
+
+    if (activityData.length > 0) {
+      await prisma.activity.createMany({ data: activityData });
+    }
 
     return NextResponse.json({ issue });
   } catch (error) {

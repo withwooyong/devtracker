@@ -3,10 +3,13 @@
 import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/main-layout";
-import { StatusBadge, PriorityBadge } from "@/components/common/status-badge";
+import { ActivityTimeline } from "@/components/common/activity-timeline";
 import Link from "next/link";
-import type { Issue, IssueStatus, IssuePriority } from "@/types/issue";
+import type { Issue } from "@/types/issue";
 import type { User } from "@/types/user";
+import type { Activity } from "@/types/activity";
+
+type TabKey = "comments" | "activities" | "all";
 
 export default function IssueDetailPage({
   params,
@@ -19,18 +22,36 @@ export default function IssueDetailPage({
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [activeTab, setActiveTab] = useState<TabKey>("comments");
 
   const { data, isLoading } = useQuery<{ issue: Issue }>({
     queryKey: ["issue", projectKey, issueNumber],
     queryFn: () =>
-      fetch(`/api/projects/${projectKey}/issues/${issueNumber}`).then((r) =>
-        r.json()
-      ),
+      fetch(`/api/projects/${projectKey}/issues/${issueNumber}`).then((r) => {
+        if (!r.ok) throw new Error("fetch failed");
+        return r.json();
+      }),
   });
 
   const { data: usersData } = useQuery<{ users: User[] }>({
     queryKey: ["users"],
-    queryFn: () => fetch("/api/users").then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
+    queryFn: () =>
+      fetch("/api/users").then((r) => {
+        if (!r.ok) throw new Error("fetch failed");
+        return r.json();
+      }),
+  });
+
+  const { data: activitiesData } = useQuery<{ activities: Activity[] }>({
+    queryKey: ["activities", projectKey, issueNumber, data?.issue?.id],
+    queryFn: () =>
+      fetch(
+        `/api/projects/${projectKey}/issues/${data!.issue.id}/activities`
+      ).then((r) => {
+        if (!r.ok) throw new Error("fetch failed");
+        return r.json();
+      }),
+    enabled: !!data?.issue?.id && (activeTab === "activities" || activeTab === "all"),
   });
 
   const updateMutation = useMutation({
@@ -39,10 +60,16 @@ export default function IssueDetailPage({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-      }).then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
+      }).then((r) => {
+        if (!r.ok) throw new Error("fetch failed");
+        return r.json();
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["issue", projectKey, issueNumber],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["activities", projectKey, issueNumber],
       });
       setIsEditing(false);
     },
@@ -57,10 +84,16 @@ export default function IssueDetailPage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content }),
         }
-      ).then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
+      ).then((r) => {
+        if (!r.ok) throw new Error("fetch failed");
+        return r.json();
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["issue", projectKey, issueNumber],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["activities", projectKey, issueNumber],
       });
       setComment("");
     },
@@ -85,6 +118,24 @@ export default function IssueDetailPage({
           이슈를 찾을 수 없습니다.
         </div>
       </MainLayout>
+    );
+  }
+
+  // Build merged timeline for "전체" tab
+  type TimelineItem =
+    | { kind: "comment"; createdAt: string; data: NonNullable<Issue["comments"]>[number] }
+    | { kind: "activity"; createdAt: string; data: Activity };
+
+  const allItems: TimelineItem[] = [];
+  if (activeTab === "all") {
+    for (const c of issue.comments ?? []) {
+      allItems.push({ kind: "comment", createdAt: c.createdAt, data: c });
+    }
+    for (const a of activitiesData?.activities ?? []) {
+      allItems.push({ kind: "activity", createdAt: a.createdAt, data: a });
+    }
+    allItems.sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
   }
 
@@ -163,59 +214,124 @@ export default function IssueDetailPage({
               </div>
             )}
 
-            {/* Comments */}
+            {/* Tab switcher */}
             <div className="space-y-4">
-              <h2 className="text-sm font-medium text-gray-700">
-                댓글 ({issue.comments?.length ?? 0})
-              </h2>
-
-              {issue.comments?.map((c) => (
-                <div
-                  key={c.id}
-                  className="bg-white p-4 rounded-lg border"
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-medium">
-                      {c.author.name.charAt(0)}
-                    </div>
-                    <span className="text-sm font-medium">
-                      {c.author.name}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {new Date(c.createdAt).toLocaleString("ko-KR")}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                    {c.content}
-                  </p>
-                </div>
-              ))}
-
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (comment.trim()) {
-                    commentMutation.mutate(comment);
-                  }
-                }}
-                className="bg-white p-4 rounded-lg border"
-              >
-                <textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors h-24"
-                  placeholder="댓글을 입력하세요..."
-                />
-                <div className="flex justify-end mt-2">
+              <div className="flex gap-1 border-b border-gray-200">
+                {(
+                  [
+                    { key: "comments", label: `댓글 (${issue.comments?.length ?? 0})` },
+                    { key: "activities", label: "활동" },
+                    { key: "all", label: "전체" },
+                  ] as { key: TabKey; label: string }[]
+                ).map(({ key, label }) => (
                   <button
-                    type="submit"
-                    disabled={commentMutation.isPending || !comment.trim()}
-                    className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
+                    key={key}
+                    onClick={() => setActiveTab(key)}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                      activeTab === key
+                        ? "border-blue-600 text-blue-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700"
+                    }`}
                   >
-                    댓글 작성
+                    {label}
                   </button>
+                ))}
+              </div>
+
+              {/* 댓글 tab */}
+              {activeTab === "comments" && (
+                <div className="space-y-4">
+                  {issue.comments?.map((c) => (
+                    <div key={c.id} className="bg-white p-4 rounded-lg border">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-medium">
+                          {c.author.name.charAt(0)}
+                        </div>
+                        <span className="text-sm font-medium">{c.author.name}</span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(c.createdAt).toLocaleString("ko-KR")}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                        {c.content}
+                      </p>
+                    </div>
+                  ))}
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (comment.trim()) {
+                        commentMutation.mutate(comment);
+                      }
+                    }}
+                    className="bg-white p-4 rounded-lg border"
+                  >
+                    <textarea
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors h-24"
+                      placeholder="댓글을 입력하세요..."
+                    />
+                    <div className="flex justify-end mt-2">
+                      <button
+                        type="submit"
+                        disabled={commentMutation.isPending || !comment.trim()}
+                        className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
+                      >
+                        댓글 작성
+                      </button>
+                    </div>
+                  </form>
                 </div>
-              </form>
+              )}
+
+              {/* 활동 tab */}
+              {activeTab === "activities" && (
+                <div className="bg-white p-4 rounded-lg border">
+                  <ActivityTimeline activities={activitiesData?.activities ?? []} />
+                </div>
+              )}
+
+              {/* 전체 tab */}
+              {activeTab === "all" && (
+                <div className="space-y-3">
+                  {allItems.length === 0 && (
+                    <div className="text-center py-8 text-sm text-gray-400">
+                      내역이 없습니다.
+                    </div>
+                  )}
+                  {allItems.map((item) => {
+                    if (item.kind === "comment") {
+                      const c = item.data;
+                      return (
+                        <div key={`comment-${c.id}`} className="bg-white p-4 rounded-lg border">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-medium">
+                              {c.author.name.charAt(0)}
+                            </div>
+                            <span className="text-sm font-medium">{c.author.name}</span>
+                            <span className="text-xs text-gray-400">댓글</span>
+                            <span className="text-xs text-gray-400">
+                              {new Date(c.createdAt).toLocaleString("ko-KR")}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                            {c.content}
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    const a = item.data;
+                    return (
+                      <div key={`activity-${a.id}`} className="bg-white px-4 py-3 rounded-lg border">
+                        <ActivityTimeline activities={[a]} />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -283,9 +399,7 @@ export default function IssueDetailPage({
               <div className="pt-2 border-t space-y-2 text-xs text-gray-500">
                 <div className="flex justify-between">
                   <span>보고자</span>
-                  <span className="text-gray-700">
-                    {issue.reporter?.name}
-                  </span>
+                  <span className="text-gray-700">{issue.reporter?.name}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>생성일</span>

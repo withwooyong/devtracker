@@ -16,11 +16,13 @@ model User {
   avatarUrl String?
   createdAt DateTime @default(now())
 
-  reportedIssues Issue[]      @relation("Reporter")
-  assignedIssues Issue[]      @relation("Assignee")
+  reportedIssues Issue[]        @relation("Reporter")
+  assignedIssues Issue[]        @relation("Assignee")
   comments       Comment[]
   deployments    Deployment[]
   projects       Project[]
+  activities     Activity[]
+  savedFilters   SavedFilter[]
 }
 
 model Project {
@@ -31,10 +33,11 @@ model Project {
   createdById String
   createdAt   DateTime @default(now())
 
-  createdBy   User         @relation(fields: [createdById], references: [id])
-  issues      Issue[]
-  labels      Label[]
-  deployments Deployment[]
+  createdBy    User          @relation(fields: [createdById], references: [id])
+  issues       Issue[]
+  labels       Label[]
+  deployments  Deployment[]
+  savedFilters SavedFilter[]
 }
 
 model Issue {
@@ -52,11 +55,12 @@ model Issue {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assignee User?     @relation("Assignee", fields: [assigneeId], references: [id])
-  reporter User      @relation("Reporter", fields: [reporterId], references: [id])
-  comments Comment[]
-  labels   Label[]   @relation("IssueLabels")
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee   User?      @relation("Assignee", fields: [assigneeId], references: [id])
+  reporter   User       @relation("Reporter", fields: [reporterId], references: [id])
+  comments   Comment[]
+  labels     Label[]    @relation("IssueLabels")
+  activities Activity[]
 
   @@unique([projectId, issueNumber])
 }
@@ -99,4 +103,31 @@ model Deployment {
 
   project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   deployedBy User    @relation(fields: [deployedById], references: [id])
+}
+
+model Activity {
+  id        String   @id @default(uuid())
+  issueId   String
+  userId    String
+  action    String   // CREATED | STATUS_CHANGED | PRIORITY_CHANGED | ASSIGNEE_CHANGED | LABEL_ADDED | LABEL_REMOVED | COMMENT_ADDED
+  field     String?
+  oldValue  String?
+  newValue  String?
+  createdAt DateTime @default(now())
+
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+}
+
+model SavedFilter {
+  id        String   @id @default(uuid())
+  projectId String
+  userId    String
+  name      String
+  filters   String   // JSON: { status, priority, assigneeId, search }
+  isShared  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
 }

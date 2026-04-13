@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/main-layout";
+import { RichEditor } from "@/components/common/rich-editor";
 import type { User } from "@/types/user";
 import type { Label } from "@/types/issue";
 
@@ -83,13 +84,12 @@ export default function NewIssuePage({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              설명 (Markdown)
+              설명
             </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors h-40 font-mono"
-              placeholder="이슈에 대한 상세 설명을 작성해주세요..."
+            <RichEditor
+              content={description}
+              onChange={setDescription}
+              placeholder="이슈 설명을 입력하세요..."
             />
           </div>
 

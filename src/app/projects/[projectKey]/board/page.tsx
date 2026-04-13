@@ -14,13 +14,11 @@ import {
   useSensors,
   type DragStartEvent,
   type DragEndEvent,
-  type DragOverEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   verticalListSortingStrategy,
   useSortable,
-  arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Issue, IssueStatus } from "@/types/issue";
@@ -201,7 +199,7 @@ export default function BoardPage({
     setActiveIssue(issue ?? null);
   }
 
-  function handleDragOver(event: DragOverEvent) {
+  function handleDragOver() {
     // No-op — real reordering happens on drag end
   }
 

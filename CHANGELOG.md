@@ -3,6 +3,30 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-13] Phase 1 기능 고도화 + Dead Code 정리
+
+### Added
+- 리치 텍스트 에디터 (tiptap) — 이슈 설명/댓글에 마크다운 지원
+- 이슈 활동 로그 — Activity 모델 + 변경 히스토리 타임라인 (댓글/활동/전체 탭)
+- 저장된 필터 — SavedFilter 모델 + CRUD API + 필터 저장/적용 UI
+- E2E 테스트 14개 추가 (리치 에디터 4, 활동 로그 4, 저장된 필터 6) — 총 21개
+- Vercel 배포 완료 — https://devtracker-dusky.vercel.app
+- 유사 오픈소스 리서치 문서 + 기능 로드맵 작업계획서
+
+### Changed
+- Issue PATCH/POST/Comment POST에 Activity 자동 생성
+- 이슈 생성/상세: textarea → RichEditor 교체
+- 이슈 목록: 저장된 필터 드롭다운 + 필터 저장 UI 추가
+
+### Fixed
+- 저장된 필터 적용 버그 — `handleApplyFilter`에서 JSON 문자열 파싱 누락
+
+### Removed
+- Dead code: `rich-viewer.tsx`, `src/lib/utils.ts`, 미사용 import/상수
+- 미사용 npm 의존성 12개: `jose`, `react-hook-form`, `uuid`, `clsx`, `tailwind-merge` 등
+
+---
+
 ## [2026-04-13] Turso(libSQL) 마이그레이션
 
 ### Changed
@@ -14,7 +38,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
 ### Removed
 - `@prisma/adapter-better-sqlite3`, `better-sqlite3` 의존성 제거
-- `@libsql/client` 직접 의존성 제거 (어댑터가 내부 포함)
+- `@libsql/client` 직접 의존성 제거 (`@prisma/adapter-libsql`의 transitive dependency로 자동 설치됨)
 
 ---
 
