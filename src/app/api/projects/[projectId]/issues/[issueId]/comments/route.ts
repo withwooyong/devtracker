@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { createNotifications } from "@/lib/notification";
 import { z } from "zod";
 
 type Params = {
@@ -92,6 +93,25 @@ export async function POST(request: NextRequest, { params }: Params) {
         action: "COMMENT_ADDED",
       },
     });
+
+    const recipients = new Set<string>();
+    if (issue.assigneeId && issue.assigneeId !== user.userId) {
+      recipients.add(issue.assigneeId);
+    }
+    if (issue.reporterId !== user.userId) {
+      recipients.add(issue.reporterId);
+    }
+    if (recipients.size > 0) {
+      await createNotifications(
+        Array.from(recipients).map((userId) => ({
+          userId,
+          type: "ISSUE_COMMENTED",
+          title: `${project.key}-${issue.issueNumber} 에 새 댓글`,
+          message: `${comment.author.name}: ${content.slice(0, 80)}`,
+          link: `/projects/${project.key}/issues/${issue.issueNumber}`,
+        }))
+      );
+    }
 
     return NextResponse.json({ comment }, { status: 201 });
   } catch (error) {

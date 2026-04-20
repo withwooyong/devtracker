@@ -33,6 +33,7 @@ export interface Issue {
   kanbanOrder: number;
   dueDate?: string | null;
   sprintId?: string | null;
+  completedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   assignee?: User | null;

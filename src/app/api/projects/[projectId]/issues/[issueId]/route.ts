@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { createNotifications } from "@/lib/notification";
 import { z } from "zod";
 
 type Params = { params: Promise<{ projectId: string; issueId: string }> };
@@ -116,11 +117,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
     }
 
+    let completedAtUpdate: Date | null | undefined;
+    if (data.status !== undefined && data.status !== existingIssue.status) {
+      if (data.status === "DONE") completedAtUpdate = new Date();
+      else if (existingIssue.status === "DONE") completedAtUpdate = null;
+    }
+
     const issue = await prisma.issue.update({
       where: { id: existingIssue.id },
       data: {
         ...data,
         dueDate: data.dueDate === null ? null : data.dueDate ? new Date(data.dueDate) : undefined,
+        ...(completedAtUpdate !== undefined
+          ? { completedAt: completedAtUpdate }
+          : {}),
         ...(labelIds !== undefined
           ? { labels: { set: labelIds.map((id) => ({ id })) } }
           : {}),
@@ -221,6 +231,44 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     if (activityData.length > 0) {
       await prisma.activity.createMany({ data: activityData });
+    }
+
+    const notifications: Parameters<typeof createNotifications>[0] = [];
+    const issueLink = `/projects/${project.key}/issues/${existingIssue.issueNumber}`;
+    const issueRef = `${project.key}-${existingIssue.issueNumber}`;
+
+    if (
+      "assigneeId" in data &&
+      data.assigneeId &&
+      data.assigneeId !== existingIssue.assigneeId &&
+      data.assigneeId !== user.userId
+    ) {
+      notifications.push({
+        userId: data.assigneeId,
+        type: "ISSUE_ASSIGNED",
+        title: `${issueRef} 이슈가 회원님에게 할당되었습니다`,
+        message: issue.title,
+        link: issueLink,
+      });
+    }
+
+    if (
+      data.status !== undefined &&
+      data.status !== existingIssue.status &&
+      existingIssue.assigneeId &&
+      existingIssue.assigneeId !== user.userId
+    ) {
+      notifications.push({
+        userId: existingIssue.assigneeId,
+        type: "ISSUE_STATUS_CHANGED",
+        title: `${issueRef} 상태 변경: ${existingIssue.status} → ${data.status}`,
+        message: issue.title,
+        link: issueLink,
+      });
+    }
+
+    if (notifications.length > 0) {
+      await createNotifications(notifications);
     }
 
     return NextResponse.json({ issue });

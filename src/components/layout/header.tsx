@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { NotificationDropdown } from "@/components/common/notification-dropdown";
 
 export function Header() {
   const pathname = usePathname();
@@ -15,7 +16,7 @@ export function Header() {
     }));
 
   return (
-    <header className="h-14 border-b border-gray-200 bg-white px-6 flex items-center">
+    <header className="h-14 border-b border-gray-200 bg-white px-6 flex items-center justify-between">
       <nav className="flex items-center gap-2 text-sm text-gray-500">
         {breadcrumbs.map((crumb, i) => (
           <span key={crumb.href} className="flex items-center gap-2">
@@ -30,6 +31,7 @@ export function Header() {
           </span>
         ))}
       </nav>
+      <NotificationDropdown />
     </header>
   );
 }

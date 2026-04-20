@@ -63,7 +63,7 @@ export function BurndownChart({
   const daysElapsed = Math.min(totalDays, dayDiff(start, today));
   const doneDates = issues
     .filter((i) => i.status === "DONE")
-    .map((i) => new Date(i.updatedAt));
+    .map((i) => new Date(i.completedAt ?? i.updatedAt));
 
   const actualPoints: { day: number; remaining: number }[] = [];
   for (let d = 0; d <= daysElapsed; d++) {
