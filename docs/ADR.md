@@ -295,3 +295,78 @@ Playwright E2E 테스트를 우선 도입한다. 단위 테스트는 추후.
 - `fullyParallel: false` (테스트 순서 보장)
 - `trace: "on-first-retry"`, `screenshot: "only-on-failure"`
 - 현재 21개 테스트 (인증 3, 대시보드 2, 네비게이션 2, 리치에디터 4, 활동로그 4, 저장필터 6)
+
+---
+
+## ADR-013: Phase 2-1 스프린트(Sprint) 도메인 추가
+
+**날짜**: 2026-04-20
+**상태**: 채택
+
+### 맥락
+기간 기반 작업 단위 관리 요구가 생겼다. 이슈를 스프린트에 묶고, 번다운 차트로 진행 상황을 가시화할 필요가 있었다.
+
+### 결정
+`Sprint` 모델과 `Issue.sprintId` 외래키를 추가한다. Sprint 삭제 시 `onDelete: SetNull`로 이슈는 백로그로 보존. 번다운 차트는 별도 라이브러리 없이 SVG로 구현. DONE 전환 시점을 정확히 기록하기 위해 `Issue.completedAt` 필드를 추가.
+
+### 근거
+- `Sprint.status`: PLANNED → ACTIVE → COMPLETED 단순 선형 흐름
+- 번다운 실제선을 `updatedAt`으로 계산하면 DONE 이후의 편집이 점을 밀어냄 → `completedAt` 필요
+- recharts/chart.js 도입 대신 SVG 직접 그리기(의존성 제로, 100줄 내외)
+- 이슈 PATCH에 `sprintId` 허용 시 해당 sprint가 같은 프로젝트에 속하는지 필수 검증(cross-project IDOR 방지)
+
+### 결과
+- 스프린트 탭(프로젝트별), 생성 폼, 상세 페이지(이슈 할당/시작/완료/번다운) 구현
+- 이슈 DONE 전환 시 `completedAt = now`, DONE 해제 시 `completedAt = null`
+- E2E 6개 시나리오 추가 (생성/유효성/상태 전환/삭제)
+
+---
+
+## ADR-014: Phase 2-2 인앱 알림 시스템
+
+**날짜**: 2026-04-20
+**상태**: 채택
+
+### 맥락
+이슈 변경/댓글/스프린트 이벤트를 관련자에게 실시간으로 알릴 필요가 있었다. 이메일/슬랙 같은 외부 채널은 Phase 3+로 미루고, 인앱 알림만 우선 구현.
+
+### 결정
+`Notification` 모델 (userId, type, title, message, link, isRead) + 30초 폴링 기반 드롭다운. 트리거는 각 API handler 내부에서 `createNotifications` 헬퍼로 발송. 전송 실패는 서버 로그로만 남기고 호출자(API 응답)에는 영향 주지 않는다.
+
+### 근거
+- WebSocket/SSE 도입은 과잉 — 팀 규모 5~20명에 30초 지연은 허용 범위
+- 알림을 트랜잭션 외부에서 best-effort 처리(Outbox 패턴 미도입) → 데이터 일관성보다 단순성 우선
+- 헬퍼에서 `link` 내부 경로(`/`) 검증으로 open redirect 사전 차단
+- 드롭다운 클릭 → 읽음 처리 + 페이지 이동은 의도적 병렬(optimistic)
+
+### 결과
+- 트리거 5종: ISSUE_ASSIGNED, ISSUE_STATUS_CHANGED, ISSUE_COMMENTED, SPRINT_STARTED, SPRINT_COMPLETED
+- `ids` 배열에 `.max(100)` 제한(DoS 방어)
+- `Notification(userId, isRead, createdAt)` 복합 인덱스로 미읽음 카운트 쿼리 최적화
+- 드롭다운 열 때 `invalidateQueries`로 즉시 재검증
+
+---
+
+## ADR-015: Prisma 7 + Next.js 16 Turbopack + pnpm 호이스팅 회피
+
+**날짜**: 2026-04-20
+**상태**: 채택
+
+### 맥락
+Phase 2-1/2-2에서 스키마가 확장(Sprint, Notification, completedAt 추가)된 이후 Vercel 빌드가 `MODULE_NOT_FOUND: @prisma/client-runtime-utils`로 실패. 로컬 빌드는 성공. 동일 코드가 7일 전 배포에서는 정상 동작했었음.
+
+### 결정
+세 가지 설정을 모두 적용:
+1. `.npmrc`의 `public-hoist-pattern[]=@prisma/*`로 Prisma 내부 패키지를 루트 `node_modules/@prisma/`에 호이스트
+2. `next.config.ts`의 `serverExternalPackages`에 Prisma/libSQL 관련 6종 명시
+3. `package.json` build 스크립트에 `--webpack` 플래그 (Next.js 16의 Turbopack 기본값 회피)
+
+### 근거
+- Prisma 7이 `prisma generate`로 생성하는 `.prisma/client/runtime/client.js`가 `require("@prisma/client-runtime-utils")`를 호출. 이 파일은 Prisma가 생성한 외부 디렉터리라 pnpm의 symlink 기반 resolution으로는 찾을 수 없음. 루트 호이스팅이 필요.
+- Turbopack의 collect-page-data 단계에서 externalRequire가 해시된 Prisma 클라이언트(`@prisma/client-a883247f22e537ea`)의 의존성을 해석하지 못함. webpack은 같은 상황에서 일반 Node.js require로 fallback.
+- `serverExternalPackages`는 번들에서 제외해 Node.js가 직접 require하게 하는데, 호이스팅이 안 되어 있으면 이 설정만으로는 부족.
+
+### 결과
+- Vercel 빌드 정상화, 프로덕션(https://devtracker-dusky.vercel.app) 재배포 성공
+- dev 서버는 여전히 Turbopack 사용 (`pnpm dev`) — 빌드만 webpack
+- 향후 Prisma 7 + Turbopack 공식 호환 패치가 나오면 `--webpack` 제거 검토
