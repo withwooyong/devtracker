@@ -1,30 +1,35 @@
 # Session Handoff
 
-> Last updated: 2026-04-20 (KST)
+> Last updated: 2026-04-20 (KST, 2차)
 > Branch: `main`
-> Latest commit: `f04cb0d` — Vercel 배포 빌드 실패 수정
+> Latest commit: `0bb242f` — webhook 프록시 public path 보정
 > Production: https://devtracker-dusky.vercel.app
 
 ## Current Status
 
-Phase 2-1 (스프린트) + Phase 2-2 (알림 시스템) + 번다운 정확도 개선 완료. E2E 27/27 통과. 모두 main 푸시 + Vercel 재배포 완료.
+Phase 3 전체 완료 — 파일 첨부(Vercel Blob) + GitHub Webhook 연동. E2E 37/37 통과, 프로덕션 배포 및 GitHub webhook ping 200 확인 완료.
 
-## Completed This Session (2026-04-20)
+## Completed This Session (2026-04-20, 2차)
 
 | # | Task | Files |
 |---|------|-------|
-| 1 | Phase 2-1: 스프린트 | Sprint 모델, API 2종, 페이지 3종, 번다운 SVG 차트, 프로젝트 서브네비 |
-| 2 | Phase 2-1 리뷰 반영 | onDelete: SetNull, cross-project IDOR, 날짜 유효성, enum 검증 |
-| 3 | 번다운 정확도 | `Issue.completedAt` 필드 추가, status DONE 전환 시 기록 |
-| 4 | Phase 2-2: 알림 시스템 | Notification 모델, API, 헬퍼, 드롭다운 UI(30초 폴링), 트리거 5종 통합 |
-| 5 | Phase 2-2 리뷰 반영 | ids.max(100), link 내부 경로 검증, HTML 태그 제거, 즉시 invalidate |
-| 6 | 스프린트 E2E 6종 | 생성/유효성/탭 이동/상태 전환(PLANNED→ACTIVE)/삭제 |
-| 7 | Vercel 빌드 수정 | `.npmrc` 호이스팅 + `serverExternalPackages` + `--webpack` |
-| 8 | ADR 3건 추가 | ADR-013/014/015 (스프린트/알림/Prisma 빌드) |
+| 1 | Phase 3-1: 파일 첨부 (Vercel Blob Public) | Attachment 모델, API 2종, 드래그앤드롭 UI |
+| 2 | Phase 3-1 보안 리뷰 반영 | orphan blob 롤백, sanitizeFilename "..", 이슈당 20개 제한, filename DB 저장 정제 |
+| 3 | MIME magic byte 검증 | file-type 라이브러리로 선언 MIME과 실제 바이트 헤더 교차 검증 |
+| 4 | Phase 3-2: GitHub Webhook | GitHubLink 모델, HMAC SHA-256 검증, PR 자동 연결, 머지 시 DONE |
+| 5 | proxy.ts webhook 경로 예외 | `/api/webhooks`를 JWT 인증 우회에 추가 (GitHub은 쿠키 없음) |
+| 6 | UUID/issueNumber 분기 버그 수정 | `parseInt("72ab...")` → 72로 해석되던 404 버그를 `/^\d+$/`로 엄격 분기 |
+| 7 | E2E 11건 추가 | 첨부 5 + GitHub 6 (무인증 접근 회귀 방지 포함) |
+| 8 | Vercel 환경변수 설정 | `BLOB_READ_WRITE_TOKEN`, `GITHUB_WEBHOOK_SECRET` 프로덕션 등록 |
+| 9 | ADR-016/017 추가 | Vercel Blob 결정, GitHub Webhook 결정 기록 |
 
-## Commits This Session
+## Commits This Session (2차)
 
 ```
+0bb242f  webhook 경로를 프록시 public list에 추가 + 무인증 접근 E2E
+fc81bff  Phase 3-2 GitHub 연동 + MIME magic byte 검증
+b263347  Phase 3-1 파일 첨부: Vercel Blob + 이슈 연동
+d369139  ADR-013/014/015 추가 + HANDOFF Phase 2 완료 반영
 f04cb0d  Vercel 배포 빌드 실패 수정: pnpm 호이스팅 + webpack 빌드
 43d33f3  스프린트 생성 폼: zod 상세 에러 메시지 노출
 f4548ac  알림 시스템 리뷰 지적사항 반영
@@ -32,48 +37,56 @@ f4548ac  알림 시스템 리뷰 지적사항 반영
 9bdf6b0  Phase 2-1 스프린트 기능 추가: 모델/API/UI + 번다운 차트
 ```
 
-## Key Decisions Made
+## Key Decisions Made (Phase 3)
 
-- **스프린트**: Sprint 삭제 시 이슈의 sprintId는 `onDelete: SetNull`로 보존(백로그로 복귀). 번다운 실제선은 `completedAt` 기준 (없으면 `updatedAt` fallback)
-- **알림**: 30초 폴링 + 드롭다운 열 때 즉시 invalidate. 실패는 best-effort (호출자에 영향 없음)
-- **알림 트리거 스코프**: 이슈 할당 변경/상태 변경(담당자에게), 댓글(담당자+보고자에게), 스프린트 시작/완료(해당 스프린트 이슈 담당자 전원에게) — 본인 제외
-- **Vercel 빌드**: Prisma 7 + Turbopack + pnpm 조합에서 `@prisma/client-runtime-utils` MODULE_NOT_FOUND → `.npmrc` 루트 호이스팅 + `build --webpack`으로 해결 (ADR-015)
-- **IDOR 강화**: 이슈 PATCH에서 `sprintId` 전달 시 해당 sprint가 같은 프로젝트에 속하는지 필수 검증
+- **Vercel Blob Public 사용**: 초기 구현 단순화를 위해 `access: "public"`. Private + signed URL은 별도 세션에서 마이그레이션 예정 (보안 리뷰 H-2 항목)
+- **MIME 이중 검증**: 클라이언트 선언 Content-Type + file-type 라이브러리 magic byte. 둘 중 하나만 통과해도 거부
+- **Webhook 전역 secret**: 프로젝트별 GitHub 설정 없이 `GITHUB_WEBHOOK_SECRET` 하나로 운영. 다중 레포 필요 시 ProjectSettings 모델 확장
+- **proxy.ts 공개 경로 확장**: `/api/webhooks`는 JWT 인증 대신 HMAC 서명으로 신뢰성 확보
+- **Webhook 머지 Activity**: `userId`를 이슈 reporter로 기록 (GitHub ↔ DevTracker 사용자 매핑 미구현)
 
 ## Known Issues
 
-- **Prisma CLI `libsql://` 미지원**: 스키마 변경 시 `prisma db push --url "file:./prisma/dev.db"` → Turso는 `turso db shell devtracker` 직접 ALTER/CREATE
-- **Turso FK 드리프트**: `Issue.sprintId` FK에 Turso는 `ON DELETE` 액션이 없음 (ALTER로 추가됨). 전송 시 API 트랜잭션으로 방어 중
-- **Board 100개 제한**: `/api/.../board` limit=100
-- **백로그 이슈 100개 제한**: 스프린트 상세의 "이슈 추가" 패널에서 `?limit=100` 하드코딩 — 초과 시 일부 누락
-- **Refresh token 서버측 무효화 불가**: 7일간 유효
-- **JWT role DB 미동기**: ADMIN 강등 즉시 반영 안 됨 (refresh까지)
-- **프로젝트 멤버십 미검증**: 의도 — 모든 인증 사용자가 모든 프로젝트 접근 가능
-- **번다운 `today` hydration**: `new Date()` 기본값 — 실사용은 문제 없으나 SSR-CSR 타임존 차이 시 mismatch 가능
-- **알림 드롭다운 Link 클릭 race**: mutation await 없이 router 이동 — 일반적으로 문제 없음
-- **CSP 헤더 미설정**
+- **Vercel Blob Public URL 영구 공개**: 퇴사자가 URL 기억 시 접근 가능 — Private + signed URL 마이그레이션 대기
+- **GitHub 사용자 매핑 없음**: PR 머지로 인한 이슈 상태 변경 Activity가 reporter 명의
+- **Prisma CLI `libsql://` 미지원**, **Turso FK 드리프트**, **백로그 100개 제한** (기존)
+- **JWT role DB 미동기**, **refresh token 서버측 무효화 불가** (기존)
+- **프로젝트 멤버십 미검증** (의도 — 모든 인증 사용자가 모든 프로젝트 접근)
+- **이모지 → SVG 일관성 미점검**
 
 ## Pending Improvements (분리 이슈)
 
+- [ ] Vercel Blob Private + signed URL 마이그레이션
 - [ ] 알림 Outbox 패턴 (best-effort → 신뢰성 있게)
 - [ ] 백로그 API에 `sprintId=none` 필터 추가 (100개 제한 해결)
+- [ ] Rate limiting (알림/첨부/webhook 엔드포인트)
 - [ ] 드롭다운 Link 클릭 mutation.onSuccess 후 router.push
-- [ ] 이모지 → SVG 일관성 점검 (알림 아이콘)
-- [ ] 스프린트 상세/알림 UI의 E2E 추가 (현재 시나리오 외)
+- [ ] GitHub push 이벤트 지원 (커밋 ↔ 이슈 자동 연결, Phase 4+)
+- [ ] 프로젝트 설정 페이지 (`/projects/[key]/settings`) — 프로젝트별 GitHub 레포 연결
+- [ ] GitHub 사용자 ↔ DevTracker 사용자 매핑
 
 ## Context for Next Session
 
 - 사용자(Ted)는 야나두 개발팀의 Jira 대안 시스템을 구축 중
-- Phase 2 완료, **Phase 3 (파일 첨부 - Vercel Blob / GitHub 연동)** 이 다음 작업
-- 작업계획서: `docs/feature-roadmap-plan.md` (Phase 3 섹션)
+- **Phase 3 완료**. 다음 방향은 (a) 분리 이슈 처리, (b) Phase 4 탐색, (c) 실제 팀 투입 전 내부 QA 중 선택
+- 작업계획서: `docs/feature-roadmap-plan.md`
 - Production URL: https://devtracker-dusky.vercel.app
 - Turso DB: `libsql://devtracker-withwooyong.aws-ap-northeast-1.turso.io`
-- GitHub: `withwooyong/devtracker`
+- GitHub: `withwooyong/devtracker` (webhook 등록 완료)
 - ADMIN: `withwooyong@yanadoocorp.com` / `yanadoo123`
 - Obsidian 심볼릭 링크: `Obsidian Vault/Ted/devtracker` → `devtracker/docs/`
 
+## Environment Variables (Production)
+
+- `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` — Turso 연결
+- `JWT_SECRET`, `JWT_REFRESH_SECRET` — 토큰 서명
+- `BLOB_READ_WRITE_TOKEN` — Vercel Blob (Phase 3-1)
+- `GITHUB_WEBHOOK_SECRET` — GitHub webhook 서명 검증 (Phase 3-2)
+
 ## Runbook
 
-- 스키마 변경 시: `npx prisma db push --url "file:./prisma/dev.db"` → `turso db shell devtracker "<SQL>"`로 Turso 반영
-- E2E 실행: `pnpm dev &` → `pnpm playwright test`
-- Vercel 재배포: `vercel --prod --yes` (CLI 47.2.2+) 또는 push to main
+- **스키마 변경**: `npx prisma db push --url "file:./prisma/dev.db"` → `turso db shell devtracker "<SQL>"`
+- **로컬 env 동기화**: `vercel env pull .env.local --yes` → 끝에 `\n` 리터럴 포함되므로 `sed -i 's/\\n"/"/g'` 후처리 필수
+- **E2E 실행**: `pnpm dev &` 후 `pnpm playwright test`
+- **Vercel 재배포**: `vercel --prod --yes` (CLI 47.2.2+)
+- **Webhook 재전송**: GitHub repo → Settings → Webhooks → 해당 delivery → Redeliver

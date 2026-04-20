@@ -370,3 +370,61 @@ Phase 2-1/2-2에서 스키마가 확장(Sprint, Notification, completedAt 추가
 - Vercel 빌드 정상화, 프로덕션(https://devtracker-dusky.vercel.app) 재배포 성공
 - dev 서버는 여전히 Turbopack 사용 (`pnpm dev`) — 빌드만 webpack
 - 향후 Prisma 7 + Turbopack 공식 호환 패치가 나오면 `--webpack` 제거 검토
+
+---
+
+## ADR-016: Phase 3-1 파일 첨부 — Vercel Blob (Public)
+
+**날짜**: 2026-04-20
+**상태**: 채택 (Public 단기), Private+Signed URL로 마이그레이션 예정
+
+### 맥락
+이슈에 이미지/문서 첨부 기능이 필요했다. 파일 저장소 선택지는 Vercel Blob, Cloudflare R2, AWS S3, Supabase Storage 등이 있었다. 접근 제어 수준(Public vs Private+Signed URL)도 결정해야 했다.
+
+### 결정
+Vercel Blob **Public** store를 사용한다. Private + signed URL 방식은 구현 복잡도가 높아 일단 Public으로 시작하고, 보안 리뷰에서 지적된 접근 제어 개선은 별도 세션에서 마이그레이션한다.
+
+### 근거
+- **저장소 선택**: Vercel 배포 환경이라 통합 부담이 최소, 환경변수 1개(`BLOB_READ_WRITE_TOKEN`)로 동작, 팀 규모 5~20명 기준 무료 티어(1GB) 충분
+- **Public 선택 이유**: 이미지 썸네일 인라인 렌더링에 서명 URL 갱신 로직 불필요, 초기 구현 단순화. 팀 내부 도구라 URL 직접 노출 리스크는 제한적이지만 영구 공개 URL이라는 점은 인지하고 있음.
+- **업로드 제약**: 4MB (Vercel 서버리스 함수 body 제한 ~4.5MB 고려), MIME prefix 화이트리스트, file-type 라이브러리로 magic byte 교차 검증 (선언 MIME 스푸핑 방지)
+- **이슈당 20개 제한**: DoS/쿼터 폭증 방어
+- **Orphan blob 방지**: DB 삽입 실패 시 `del()` 롤백. DELETE 시 blob 삭제 실패는 best-effort로 로그만 남김
+
+### 결과
+- `Attachment` 모델 + POST(multipart)/DELETE API + 드래그앤드롭 UI
+- sanitize된 filename을 DB에 저장 (원본 보존이 아니라 안전성 우선)
+- E2E 5건: 업로드/크기 제한/MIME 거부/리스트 렌더/삭제
+- **미해결**: Public URL은 퇴사자가 URL을 기억하고 있으면 영구 접근 가능. 장기적으로 Private + signed URL 마이그레이션 필요
+
+---
+
+## ADR-017: Phase 3-2 GitHub Webhook — 이슈 자동 연결
+
+**날짜**: 2026-04-20
+**상태**: 채택
+
+### 맥락
+PR과 이슈를 수동으로 연결하는 대신, GitHub PR 제목/브랜치명에 `DEV-123` 형태의 이슈 키가 포함되면 자동으로 연결되고 머지 시 이슈 상태를 DONE으로 전환하는 기능이 필요했다.
+
+### 결정
+**수신 전용 webhook**으로 시작한다. PR 이벤트만 구독하고, 커밋/브랜치 이벤트는 보류(Phase 4+). GitHub API 역방향 호출(예: 이슈 댓글에 PR 링크 자동 추가)은 범위 밖.
+
+- 엔드포인트: `POST /api/webhooks/github`
+- 서명 검증: `X-Hub-Signature-256` 헤더 + HMAC SHA-256 (timingSafeEqual로 타이밍 공격 방어)
+- 구독 이벤트: `pull_request` (opened/edited/closed, merged 플래그 포함), `ping`
+- 이슈 키 추출: `/\b([A-Z][A-Z0-9]+)-(\d+)\b/g` 패턴을 PR 제목과 `head.ref`에서 매칭
+- PR 머지 시: 연결된 이슈 상태를 DONE + `completedAt` + `STATUS_CHANGED` Activity 로그 (reporter 명의)
+
+### 근거
+- **Webhook-only**: GitHub API 클라이언트 상태 관리(Rate limit, 토큰 갱신) 불필요, 단방향으로 단순
+- **Pull requests만 구독**: push 이벤트는 WIP 커밋까지 포함해 노이즈가 크고, 브랜치명은 이미 PR의 `head.ref`에서 추출 가능
+- **프로젝트 단위 설정 없이 전역 secret**: `GITHUB_WEBHOOK_SECRET` 환경변수 1개로 관리. 다중 레포/프로젝트 연결이 필요해지면 `ProjectSettings` 모델로 확장 (현재 범위 밖)
+- **proxy.ts public path 추가**: webhook은 쿠키가 없는 호출이므로 `/api/webhooks`를 JWT 인증 우회 목록에 등록. 서명 검증만으로 신뢰성 확보
+- **GitHubLink `(issueId, url)` unique**: 같은 PR이 여러 번 이벤트 발생해도 upsert로 최신 상태만 유지
+
+### 결과
+- `GitHubLink` 모델 (type/url/title/status/externalId) + webhook handler + 이슈 상세 GitHub 섹션 UI
+- E2E 6건: 무인증 접근/서명 거부/ping/PR 생성/머지 시 DONE/매칭 실패
+- 프로덕션 webhook 등록 + 서명 검증 + ping 200 응답 확인 완료 (GitHub repo → Settings → Webhooks)
+- **알려진 한계**: 이슈 상태 변경 시 Activity의 `userId`가 reporter로 기록됨 (webhook은 사용자 컨텍스트 없음). 향후 GitHub 사용자 ↔ DevTracker 사용자 매핑 기능 추가 시 실제 작성자로 변경 가능
