@@ -46,29 +46,27 @@ tests/e2e/
 playwright.config.ts               # Playwright 설정
 ```
 
-## 현재 테스트 목록 (7개)
+## 현재 테스트 목록 (43개, 11개 Journey)
 
-### auth.spec.ts — 인증 플로우
+| Journey | Spec 파일 | 테스트 수 |
+|---------|-----------|-----------|
+| 1. 로그인 플로우 | auth.spec.ts | 3 |
+| 2. 대시보드 | dashboard.spec.ts | 2 |
+| 4. 프로젝트 네비게이션 | project-navigation.spec.ts | 2 |
+| 5. 리치 텍스트 에디터 | rich-editor.spec.ts | 4 |
+| 6. 이슈 활동 로그 | activity-log.spec.ts | 4 |
+| 7. 저장된 필터 | saved-filters.spec.ts | 6 |
+| 8. 스프린트 라이프사이클 | sprints.spec.ts | 6 |
+| 9. 이슈 첨부파일 (Vercel Blob Private) | attachments.spec.ts | 7 |
+| 10. GitHub Webhook | github-webhook.spec.ts | 6 |
+| 11. 알림 Outbox | notification-outbox.spec.ts | 4 |
 
-| 테스트 | 설명 |
-|--------|------|
-| 로그인 성공 → 대시보드 리다이렉트 | /login에서 이메일/비밀번호 입력 → /dashboard로 이동 |
-| 잘못된 비밀번호 → 에러 메시지 | 틀린 비밀번호 입력 시 에러 표시, /login 유지 |
-| 비인증 → 대시보드 접근 차단 | 로그인 없이 /dashboard 접근 시 /login 리다이렉트 |
+### 주요 검증 포인트
 
-### dashboard.spec.ts — 대시보드
-
-| 테스트 | 설명 |
-|--------|------|
-| 프로젝트 카드 표시 | 로그인 후 프로젝트 카드에 이슈/배포 count 표시 |
-| 프로젝트 카드 링크 | 카드의 href가 `/projects/[KEY]` 형태인지 확인 |
-
-### project-navigation.spec.ts — 프로젝트 네비게이션
-
-| 테스트 | 설명 |
-|--------|------|
-| 대시보드 → 프로젝트 → 이슈 목록 | 카드 클릭 → 이슈 테이블 + 네비게이션 탭 표시 |
-| 프로젝트 이름 표시 | 이슈 목록 h1에 프로젝트 이름 표시 |
+- **인증/권한**: 로그인, 인가, IDOR, 무인증 접근 차단
+- **데이터 CRUD**: 이슈/스프린트/필터/알림 생성·조회·수정·삭제
+- **외부 연동**: Vercel Blob 프록시 다운로드, GitHub webhook HMAC 서명
+- **백그라운드 작업**: 알림 Outbox 인라인 드레인 + cron 드레인 경로
 
 ## 테스트 작성 가이드
 

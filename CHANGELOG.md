@@ -3,6 +3,38 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-20] Phase 2·3 + 분리 이슈 일괄 처리
+
+### Added
+- Phase 2-1 스프린트: `Sprint` 모델, `Issue.sprintId`/`completedAt`, SVG 번다운 차트, 목록/생성/상세 페이지 (`9bdf6b0`)
+- Phase 2-2 인앱 알림: `Notification` 모델, 헤더 벨 드롭다운(30초 폴링), 5종 트리거 통합 (`3783430`)
+- Phase 3-1 파일 첨부: `Attachment` 모델 + Vercel Blob Private store + 프록시 다운로드 엔드포인트 + 드래그앤드롭 UI (`b263347`, `77b60a7`)
+- Phase 3-2 GitHub Webhook: `GitHubLink` 모델 + HMAC SHA-256 검증 + PR 제목 이슈 키 자동 연결 + 머지 시 DONE 전환 (`fc81bff`)
+- 알림 Outbox 패턴: `NotificationOutbox` + 인라인 드레인 + 일일 cron safety net (`ea877a4`, `5d2bf99`)
+- E2E 테스트 22건 추가 (스프린트 6, 첨부 7, GitHub 6, 알림 Outbox 4 + 기타 회귀) — 총 43개
+- ADR-013~018 추가 (스프린트/알림/Prisma 빌드/Blob/GitHub webhook/Outbox)
+- 문서 현행화: user-guide에 Phase 2·3 섹션, e2e-testing-guide 43개 반영, feature-roadmap-plan 완료 표시
+
+### Changed
+- 이슈 PATCH에 `sprintId` 허용 + cross-project IDOR 검증
+- 이슈 PATCH의 `completedAt` 자동 기록(status→DONE 전환 시)
+- Issue API `?sprintId=none` 필터 추가로 백로그 조회 100개 제한 해소 (`287a804`)
+- 알림 트리거가 Notification을 직접 생성 → NotificationOutbox에 insert 후 드레인 (ADR-018)
+- 첨부 Blob store를 Public → Private로 재생성, 모든 접근이 서버 프록시 경유 (`77b60a7`)
+- proxy.ts 공개 경로에 `/api/webhooks`, `/api/cron` 추가 (쿠키 없는 호출 허용)
+- `.npmrc` + `next.config.ts serverExternalPackages` + `package.json build --webpack`으로 Vercel Prisma 7 호이스팅 이슈 해결 (`f04cb0d`)
+
+### Fixed
+- UUID로 시작하는 숫자가 `parseInt`로 잘못 해석돼 `issueNumber`로 조회되던 버그 (`/^\d+$/` 엄격 검사로 교체)
+- 스프린트 생성 폼이 zod 상세 에러 메시지를 surface하지 않던 문제 (`43d33f3`)
+- 알림 시스템 리뷰 지적사항 반영: `ids.max(100)`, link 내부 경로 검증, HTML 태그 제거 (`f4548ac`)
+- 파일 첨부 보안 리뷰 반영: orphan blob 롤백, sanitizeFilename `..` 방어, 이슈당 20개 제한, MIME magic byte 교차 검증
+
+### Removed
+- 기존 Public Vercel Blob store 및 관련 Attachment 레코드 전부 (Private 마이그레이션)
+
+---
+
 ## [2026-04-13] Phase 1 기능 고도화 + Dead Code 정리
 
 ### Added

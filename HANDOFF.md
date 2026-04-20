@@ -1,13 +1,13 @@
 # Session Handoff
 
-> Last updated: 2026-04-20 (KST, 4차)
+> Last updated: 2026-04-20 (KST, 4차 + /handoff)
 > Branch: `main`
-> Latest commit: `5d2bf99` — Outbox 인라인 + 일일 cron safety net
+> Latest commit: `20dedb5` — ADR-014 보완 + ADR-018 Outbox 추가 + HANDOFF 4차 갱신
 > Production: https://devtracker-dusky.vercel.app
 
 ## Current Status
 
-Phase 1/2/3 완료 + 분리 이슈 3건 전부 해결 (백로그 limit, Private Blob 마이그레이션, 알림 Outbox). E2E 43/43 통과, 프로덕션 배포 + GitHub webhook ping + Private Blob 프록시 + Outbox cron 검증 완료.
+Phase 1/2/3 완료 + 분리 이슈 3건 전부 해결 (백로그 limit, Private Blob 마이그레이션, 알림 Outbox). E2E 43/43 통과, 프로덕션 배포 + GitHub webhook ping + Private Blob 프록시 + Outbox cron 검증 완료. /handoff로 CHANGELOG + 관련 docs(e2e-testing-guide, feature-roadmap-plan, user-guide) 현행화.
 
 ## Completed This Session (2026-04-20, 4차 누계)
 
@@ -27,6 +27,7 @@ Phase 1/2/3 완료 + 분리 이슈 3건 전부 해결 (백로그 limit, Private 
 ## Recent Commits
 
 ```
+20dedb5  ADR-014 보완 + ADR-018 Outbox 추가 + HANDOFF 4차 갱신
 5d2bf99  Outbox 드레인을 인라인 + 일일 cron 조합으로 전환
 ea877a4  알림 Outbox 패턴: 유실 방지 + 재시도
 f8c7d7e  ADR-016 Private 전환 반영 + HANDOFF 분리 이슈 2건 완료 체크
