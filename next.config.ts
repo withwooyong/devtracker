@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: [
+    "@prisma/client",
+    ".prisma/client",
+    "@prisma/client-runtime-utils",
+    "@prisma/debug",
+    "@prisma/driver-adapter-utils",
+    "@prisma/adapter-libsql",
+    "@libsql/client",
+  ],
   async headers() {
     return [
       {
