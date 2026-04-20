@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { drainInBackground } from "@/lib/notification-drain";
 import type { NotificationType } from "@/types/notification";
 
 interface CreateNotificationInput {
@@ -43,6 +44,7 @@ export async function createNotification(input: CreateNotificationInput) {
   }
   try {
     await prisma.notificationOutbox.create({ data: input });
+    drainInBackground();
   } catch (err) {
     console.error("[notification] outbox insert failed", {
       err,
@@ -69,6 +71,7 @@ export async function createNotifications(inputs: CreateNotificationInput[]) {
   if (list.length === 0) return;
   try {
     await prisma.notificationOutbox.createMany({ data: list });
+    drainInBackground();
   } catch (err) {
     console.error("[notification] outbox createMany failed", {
       err,
