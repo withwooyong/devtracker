@@ -32,6 +32,7 @@ export interface Issue {
   reporterId: string;
   kanbanOrder: number;
   dueDate?: string | null;
+  sprintId?: string | null;
   createdAt: string;
   updatedAt: string;
   assignee?: User | null;

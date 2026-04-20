@@ -23,6 +23,7 @@ model User {
   projects       Project[]
   activities     Activity[]
   savedFilters   SavedFilter[]
+  createdSprints Sprint[]       @relation("SprintCreator")
 }
 
 model Project {
@@ -38,6 +39,7 @@ model Project {
   labels       Label[]
   deployments  Deployment[]
   savedFilters SavedFilter[]
+  sprints      Sprint[]
 }
 
 model Issue {
@@ -52,12 +54,14 @@ model Issue {
   reporterId  String
   kanbanOrder Int      @default(0)
   dueDate     DateTime?
+  sprintId    String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assignee   User?      @relation("Assignee", fields: [assigneeId], references: [id])
   reporter   User       @relation("Reporter", fields: [reporterId], references: [id])
+  sprint     Sprint?    @relation(fields: [sprintId], references: [id], onDelete: SetNull)
   comments   Comment[]
   labels     Label[]    @relation("IssueLabels")
   activities Activity[]
@@ -109,7 +113,7 @@ model Activity {
   id        String   @id @default(uuid())
   issueId   String
   userId    String
-  action    String   // CREATED | STATUS_CHANGED | PRIORITY_CHANGED | ASSIGNEE_CHANGED | LABEL_ADDED | LABEL_REMOVED | COMMENT_ADDED
+  action    String   // CREATED | STATUS_CHANGED | PRIORITY_CHANGED | ASSIGNEE_CHANGED | LABEL_ADDED | LABEL_REMOVED | COMMENT_ADDED | SPRINT_CHANGED
   field     String?
   oldValue  String?
   newValue  String?
@@ -117,6 +121,22 @@ model Activity {
 
   issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id])
+}
+
+model Sprint {
+  id          String    @id @default(uuid())
+  projectId   String
+  name        String
+  goal        String?
+  startDate   DateTime
+  endDate     DateTime
+  status      String    @default("PLANNED") // PLANNED | ACTIVE | COMPLETED
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("SprintCreator", fields: [createdById], references: [id])
+  issues    Issue[]
 }
 
 model SavedFilter {

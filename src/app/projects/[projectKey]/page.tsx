@@ -147,6 +147,12 @@ export default function ProjectIssuePage({
                 칸반 보드
               </Link>
               <Link
+                href={`/projects/${projectKey}/sprints`}
+                className="text-gray-500 hover:text-gray-700 pb-1"
+              >
+                스프린트
+              </Link>
+              <Link
                 href={`/projects/${projectKey}/deployments`}
                 className="text-gray-500 hover:text-gray-700 pb-1"
               >

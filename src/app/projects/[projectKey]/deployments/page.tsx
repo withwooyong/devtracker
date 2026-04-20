@@ -57,6 +57,12 @@ export default function DeploymentsPage({
                 칸반 보드
               </Link>
               <Link
+                href={`/projects/${projectKey}/sprints`}
+                className="text-gray-500 hover:text-gray-700 pb-1"
+              >
+                스프린트
+              </Link>
+              <Link
                 href={`/projects/${projectKey}/deployments`}
                 className="text-blue-600 font-medium border-b-2 border-blue-600 pb-1"
               >

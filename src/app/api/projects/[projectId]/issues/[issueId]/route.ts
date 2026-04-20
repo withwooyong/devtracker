@@ -66,6 +66,7 @@ const updateSchema = z.object({
   labelIds: z.array(z.string()).optional(),
   dueDate: z.string().optional().nullable(),
   kanbanOrder: z.number().optional(),
+  sprintId: z.string().optional().nullable(),
 });
 
 export async function PATCH(request: NextRequest, { params }: Params) {
@@ -100,6 +101,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     if (!existingIssue) {
       return NextResponse.json({ error: "이슈를 찾을 수 없습니다." }, { status: 404 });
+    }
+
+    if (data.sprintId) {
+      const sprint = await prisma.sprint.findFirst({
+        where: { id: data.sprintId, projectId: project.id },
+        select: { id: true },
+      });
+      if (!sprint) {
+        return NextResponse.json(
+          { error: "해당 스프린트는 이 프로젝트에 속하지 않습니다." },
+          { status: 400 }
+        );
+      }
     }
 
     const issue = await prisma.issue.update({
@@ -165,6 +179,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       });
     }
 
+    if ("sprintId" in data && data.sprintId !== existingIssue.sprintId) {
+      activityData.push({
+        issueId: existingIssue.id,
+        userId: user.userId,
+        action: "SPRINT_CHANGED",
+        field: "sprintId",
+        oldValue: existingIssue.sprintId ?? null,
+        newValue: data.sprintId ?? null,
+      });
+    }
+
     if (labelIds !== undefined) {
       const existingLabelIds = new Set(existingIssue.labels.map((l) => l.id));
       const newLabelIds = new Set(labelIds);
@@ -201,9 +226,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ issue });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "입력값 오류" }, { status: 400 });
+      return NextResponse.json(
+        { error: "입력값이 올바르지 않습니다.", details: error.issues },
+        { status: 400 }
+      );
     }
-    return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+    return NextResponse.json(
+      { error: "서버 오류가 발생했습니다." },
+      { status: 500 }
+    );
   }
 }
 
@@ -233,6 +264,9 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     await prisma.issue.delete({ where: { id: issue.id } });
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+    return NextResponse.json(
+      { error: "서버 오류가 발생했습니다." },
+      { status: 500 }
+    );
   }
 }
