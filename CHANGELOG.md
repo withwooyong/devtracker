@@ -3,6 +3,26 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-21] 알림 Outbox Transactional 승격
+
+### Added
+- `src/lib/notification.ts`: `enqueueNotificationsTx(tx, inputs)` + `triggerNotificationDrain()` — outbox insert를 호출자의 `$transaction` 안에서만 수행하도록 타입으로 강제 (`a38aaa9`)
+
+### Changed
+- 이슈 PATCH: `issue.update` + `activity.createMany` + 알림 enqueue를 단일 `prisma.$transaction`으로 묶음 (`a38aaa9`)
+- 댓글 POST: `comment.create` + `activity.create` + 알림 enqueue를 단일 `prisma.$transaction`으로 묶음 (`a38aaa9`)
+- 스프린트 PATCH: `sprint.update` + 알림 enqueue를 단일 `prisma.$transaction`으로 묶음. assignee 목록 read는 tx 밖으로 분리해 write-only tx 유지 (libSQL 단일 라이터 lock 경쟁 최소화) (`a38aaa9`)
+- `triggerNotificationDrain()`은 트랜잭션 커밋 성공 후에만 호출, 실제 알림이 enqueue된 경우에만 호출하도록 가드 추가
+- ADR-018 아토믹성 보강 절 추가, HANDOFF "Outbox 진정한 아토믹성 미보장" 항목 제거
+
+### Removed
+- `createNotification` / `createNotifications` 기존 API — 호출자가 트랜잭션 밖에서 outbox에 insert하지 못하도록 삭제
+
+### Fixed
+- 본 요청 커밋 후 outbox insert 실패 시 알림 유실, 본 요청 롤백 후 outbox insert가 살아남아 유령 알림이 생기는 가능성 제거
+
+---
+
 ## [2026-04-20] Phase 2·3 + 분리 이슈 일괄 처리
 
 ### Added
