@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifyAccessToken, verifyRefreshToken } from "@/lib/auth";
 
-const PUBLIC_PATHS = ["/login", "/api/auth", "/_next", "/favicon"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/auth",
+  "/api/webhooks",
+  "/_next",
+  "/favicon",
+];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

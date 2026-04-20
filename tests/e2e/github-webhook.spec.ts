@@ -62,6 +62,26 @@ test.describe("Journey 10: GitHub Webhook", () => {
     await loginViaApi(page);
   });
 
+  test("webhook is reachable without auth cookie (GitHub has no cookies)", async ({
+    playwright,
+  }) => {
+    // Use a fresh request context without login cookies to simulate real GitHub call
+    const ctx = await playwright.request.newContext({
+      baseURL: "http://localhost:3000",
+    });
+    const body = JSON.stringify({ zen: "hello" });
+    const res = await ctx.post("/api/webhooks/github", {
+      headers: {
+        "x-github-event": "ping",
+        "x-hub-signature-256": signBody(body),
+        "content-type": "application/json",
+      },
+      data: body,
+    });
+    expect(res.status()).toBe(200);
+    await ctx.dispose();
+  });
+
   test("rejects requests with invalid signature", async ({ page }) => {
     const body = JSON.stringify({ action: "opened" });
     const res = await page.request.post("/api/webhooks/github", {
