@@ -69,6 +69,7 @@ model Issue {
   labels      Label[]      @relation("IssueLabels")
   activities  Activity[]
   attachments Attachment[]
+  githubLinks GitHubLink[]
 
   @@unique([projectId, issueNumber])
 }
@@ -156,6 +157,23 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead, createdAt])
+}
+
+model GitHubLink {
+  id        String   @id @default(uuid())
+  issueId   String
+  type      String   // PR | COMMIT | BRANCH
+  url       String
+  title     String
+  status    String?  // open | closed | merged
+  externalId String? // GitHub PR number (e.g. "123") for dedup
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@unique([issueId, url])
+  @@index([issueId])
 }
 
 model Sprint {

@@ -20,6 +20,7 @@
     "@tiptap/starter-kit": "^3.22.3",
     "@vercel/blob": "^2.3.3",
     "bcryptjs": "^3.0.3",
+    "file-type": "^22.0.1",
     "jsonwebtoken": "^9.0.3",
     "next": "16.2.3",
     "prisma": "^7.7.0",

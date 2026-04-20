@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put, del } from "@vercel/blob";
+import { fileTypeFromBuffer } from "file-type";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import {
@@ -121,6 +122,38 @@ export async function POST(request: NextRequest, { params }: Params) {
     );
   }
 
+  // Magic-byte 검증: 클라이언트가 보낸 Content-Type과 실제 바이트 헤더 교차 확인
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const detected = await fileTypeFromBuffer(buffer);
+  // text/*, application/json 등은 file-type 라이브러리가 감지하지 못함 — 바이너리 포맷만 강제 검증
+  const needsMagicCheck =
+    file.type.startsWith("image/") ||
+    file.type === "application/pdf" ||
+    file.type === "application/zip" ||
+    file.type.startsWith("application/vnd.") ||
+    file.type.startsWith("application/msword") ||
+    file.type.startsWith("application/vnd.ms-excel");
+
+  if (needsMagicCheck) {
+    if (!detected || !isAllowedMime(detected.mime)) {
+      return NextResponse.json(
+        { error: "파일 내용이 선언된 형식과 일치하지 않습니다." },
+        { status: 400 }
+      );
+    }
+    // 선언 MIME의 주요 카테고리(예: image/)와 실제 감지 MIME이 같은 카테고리인지 확인
+    const declaredCategory = file.type.split("/")[0];
+    const detectedCategory = detected.mime.split("/")[0];
+    if (declaredCategory !== detectedCategory) {
+      return NextResponse.json(
+        {
+          error: `파일 형식 불일치: 선언=${file.type}, 실제=${detected.mime}`,
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   const attachmentCount = await prisma.attachment.count({
     where: { issueId: issue.id },
   });
@@ -138,7 +171,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   let blobUrl: string | null = null;
   try {
-    const blob = await put(blobPath, file, {
+    const blob = await put(blobPath, buffer, {
       access: "public",
       contentType: file.type,
     });
