@@ -30,7 +30,10 @@ export default function NewSprintPage({
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
-        throw new Error(payload?.error ?? "생성 실패");
+        const detail = Array.isArray(payload?.details)
+          ? payload.details.map((d: { message?: string }) => d.message).filter(Boolean).join(", ")
+          : "";
+        throw new Error(detail || payload?.error || "생성 실패");
       }
       return res.json();
     },
