@@ -6,6 +6,7 @@ const PUBLIC_PATHS = [
   "/login",
   "/api/auth",
   "/api/webhooks",
+  "/api/cron",
   "/_next",
   "/favicon",
 ];

@@ -159,6 +159,21 @@ model Notification {
   @@index([userId, isRead, createdAt])
 }
 
+model NotificationOutbox {
+  id           String   @id @default(uuid())
+  userId       String
+  type         String
+  title        String
+  message      String
+  link         String
+  attempts     Int      @default(0)
+  lastError    String?
+  scheduledFor DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([scheduledFor, attempts])
+}
+
 model GitHubLink {
   id        String   @id @default(uuid())
   issueId   String
