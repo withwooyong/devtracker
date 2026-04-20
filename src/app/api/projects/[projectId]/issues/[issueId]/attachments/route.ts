@@ -172,7 +172,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   let blobUrl: string | null = null;
   try {
     const blob = await put(blobPath, buffer, {
-      access: "public",
+      access: "private",
       contentType: file.type,
     });
     blobUrl = blob.url;

@@ -171,6 +171,7 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
             {attachments.map((att) => {
               const canDelete =
                 user?.id === att.userId || user?.role === "ADMIN";
+              const downloadUrl = `/api/projects/${projectKey}/issues/${issueId}/attachments/${att.id}/download`;
               return (
                 <li
                   key={att.id}
@@ -179,7 +180,7 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
                   {isImage(att.mimeType) ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
-                      src={att.url}
+                      src={downloadUrl}
                       alt={att.filename}
                       className="w-10 h-10 object-cover rounded border border-gray-200"
                     />
@@ -190,7 +191,7 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
                   )}
                   <div className="flex-1 min-w-0">
                     <a
-                      href={att.url}
+                      href={downloadUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-sm text-gray-900 hover:text-blue-600 truncate block"

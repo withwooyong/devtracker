@@ -69,7 +69,44 @@ test.describe("Journey 9: Issue Attachments", () => {
 
     fs.unlinkSync(tmp);
 
+    // 프록시 다운로드로 실제 바이트 검증
+    const downloadRes = await page.request.get(
+      `/api/projects/${PROJECT_KEY}/issues/${issue.id}/attachments/${attachment.id}/download`
+    );
+    expect(downloadRes.status()).toBe(200);
+    expect(downloadRes.headers()["content-type"]).toBe("image/png");
+    const downloadedBytes = await downloadRes.body();
+    expect(downloadedBytes.equals(TINY_PNG)).toBe(true);
+
     // Cleanup: delete the uploaded attachment + issue
+    await page.request.delete(
+      `/api/projects/${PROJECT_KEY}/issues/${issue.id}/attachments/${attachment.id}`
+    );
+  });
+
+  test("download proxy requires authentication", async ({ page, playwright }) => {
+    const issue = await ensureIssue(page);
+    const uploadRes = await page.request.post(
+      `/api/projects/${PROJECT_KEY}/issues/${issue.id}/attachments`,
+      {
+        multipart: {
+          file: { name: "auth.png", mimeType: "image/png", buffer: TINY_PNG },
+        },
+      }
+    );
+    const { attachment } = await uploadRes.json();
+
+    // fresh context without auth cookies
+    const anon = await playwright.request.newContext({
+      baseURL: "http://localhost:3000",
+    });
+    const res = await anon.get(
+      `/api/projects/${PROJECT_KEY}/issues/${issue.id}/attachments/${attachment.id}/download`
+    );
+    expect(res.status()).toBe(401);
+    await anon.dispose();
+
+    // cleanup
     await page.request.delete(
       `/api/projects/${PROJECT_KEY}/issues/${issue.id}/attachments/${attachment.id}`
     );
