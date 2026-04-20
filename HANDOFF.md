@@ -1,13 +1,13 @@
 # Session Handoff
 
-> Last updated: 2026-04-20 (KST, 4차 + /handoff)
+> Last updated: 2026-04-20 (KST, 5차 — Outbox 아토믹성 강화)
 > Branch: `main`
-> Latest commit: `20dedb5` — ADR-014 보완 + ADR-018 Outbox 추가 + HANDOFF 4차 갱신
+> Latest commit: (pending) — Outbox Transactional 승격 (ADR-018 보강)
 > Production: https://devtracker-dusky.vercel.app
 
 ## Current Status
 
-Phase 1/2/3 완료 + 분리 이슈 3건 전부 해결 (백로그 limit, Private Blob 마이그레이션, 알림 Outbox). E2E 43/43 통과, 프로덕션 배포 + GitHub webhook ping + Private Blob 프록시 + Outbox cron 검증 완료. /handoff로 CHANGELOG + 관련 docs(e2e-testing-guide, feature-roadmap-plan, user-guide) 현행화.
+Phase 1/2/3 완료 + 분리 이슈 3건 전부 해결 + **알림 Outbox 아토믹성 강화(Transactional Outbox)** 완료. E2E 43/43 유지, 본 요청 write와 outbox insert가 단일 `$transaction`으로 묶여 유실/유령 알림 가능성 제거.
 
 ## Completed This Session (2026-04-20, 4차 누계)
 
@@ -58,7 +58,6 @@ f4548ac  알림 시스템 리뷰 지적사항 반영
 
 ## Known Issues
 
-- **Outbox 진정한 아토믹성 미보장**: 본 요청 커밋 후 outbox insert 실패 시 유실 가능 (fire-and-forget). 각 API 핸들러를 `$transaction`으로 감싸는 후속 작업 필요
 - **Outbox inline drain fire-and-forget**: 서버리스 특성상 응답 종료 시 promise 중단 가능 → 일일 cron이 catch-up
 - **GitHub 사용자 매핑 없음**: PR 머지로 인한 이슈 상태 변경 Activity가 reporter 명의
 - **첨부 다운로드가 Vercel 함수 경유**: 콜드 스타트 + 대역폭 비용 (팀 규모엔 허용)
@@ -75,10 +74,10 @@ f4548ac  알림 시스템 리뷰 지적사항 반영
 - [ ] 프로젝트 설정 페이지 (`/projects/[key]/settings`) — 프로젝트별 GitHub 레포 연결
 - [ ] GitHub 사용자 ↔ DevTracker 사용자 매핑
 - [ ] Orphan blob cleanup 배치 (head list 대조)
-- [ ] 알림 Outbox 아토믹성 강화 (`$transaction` 도입)
 - [x] ~~Vercel Blob Private 마이그레이션~~ — 완료 (77b60a7)
 - [x] ~~백로그 API sprintId=none 필터~~ — 완료 (287a804)
 - [x] ~~알림 Outbox 패턴~~ — 완료 (5d2bf99)
+- [x] ~~알림 Outbox 아토믹성 강화 (`$transaction` 도입)~~ — 완료 (이번 세션)
 
 ## Context for Next Session
 

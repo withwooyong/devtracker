@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { drainInBackground } from "@/lib/notification-drain";
 import type { NotificationType } from "@/types/notification";
 
@@ -10,7 +10,6 @@ interface CreateNotificationInput {
   link: string;
 }
 
-// 방어: 알림 링크는 내부 경로만 허용
 function isValidLink(link: string): boolean {
   return (
     typeof link === "string" &&
@@ -19,42 +18,11 @@ function isValidLink(link: string): boolean {
   );
 }
 
-// 배치 내 중복 제거 (스프린트 시작처럼 동일 링크로 여러 명에게 가는 경우에만 의미)
 function dedupKey(item: CreateNotificationInput) {
   return `${item.userId}:${item.type}:${item.link}`;
 }
 
-/**
- * 알림은 NotificationOutbox에 먼저 적재되고, 별도 cron drain 프로세스가
- * 실제 Notification 행을 생성한다. 본 요청의 응답 경로를 빠르게 유지하고,
- * 일시 장애 시 재시도를 가능하게 한다.
- *
- * 참고: 여기가 본 요청 트랜잭션과 atomic하지는 않다 — 본 트랜잭션 커밋 후
- * outbox insert가 실패하면 알림이 유실될 수 있다. 진짜 아토믹성은 각 호출
- * 지점을 prisma.$transaction으로 감싸는 후속 작업 필요.
- */
-export async function createNotification(input: CreateNotificationInput) {
-  if (!isValidLink(input.link)) {
-    console.error("[notification] rejected invalid link", {
-      userId: input.userId,
-      type: input.type,
-      link: input.link,
-    });
-    return;
-  }
-  try {
-    await prisma.notificationOutbox.create({ data: input });
-    drainInBackground();
-  } catch (err) {
-    console.error("[notification] outbox insert failed", {
-      err,
-      userId: input.userId,
-      type: input.type,
-    });
-  }
-}
-
-export async function createNotifications(inputs: CreateNotificationInput[]) {
+function sanitize(inputs: CreateNotificationInput[]) {
   const unique = new Map<string, CreateNotificationInput>();
   for (const item of inputs) {
     if (!isValidLink(item.link)) {
@@ -67,16 +35,24 @@ export async function createNotifications(inputs: CreateNotificationInput[]) {
     }
     unique.set(dedupKey(item), item);
   }
-  const list = Array.from(unique.values());
+  return Array.from(unique.values());
+}
+
+/**
+ * 본 요청 트랜잭션 내부에서 알림을 outbox에 적재한다.
+ * 본 요청 write가 롤백되면 outbox도 함께 롤백되어 알림 유실/유령 알림을 방지.
+ * 트랜잭션 커밋 성공 후 triggerNotificationDrain()을 호출해 즉시 배달 시도.
+ */
+export async function enqueueNotificationsTx(
+  tx: Prisma.TransactionClient,
+  inputs: CreateNotificationInput[]
+) {
+  const list = sanitize(inputs);
   if (list.length === 0) return;
-  try {
-    await prisma.notificationOutbox.createMany({ data: list });
-    drainInBackground();
-  } catch (err) {
-    console.error("[notification] outbox createMany failed", {
-      err,
-      count: list.length,
-      types: Array.from(new Set(list.map((i) => i.type))),
-    });
-  }
+  await tx.notificationOutbox.createMany({ data: list });
+}
+
+/** 트랜잭션 커밋 후 인라인 드레인을 예약한다. 실패는 삼키고 일일 cron이 catch-up. */
+export function triggerNotificationDrain() {
+  drainInBackground();
 }

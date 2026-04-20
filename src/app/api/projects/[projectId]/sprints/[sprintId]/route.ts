@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { createNotifications } from "@/lib/notification";
+import {
+  enqueueNotificationsTx,
+  triggerNotificationDrain,
+} from "@/lib/notification";
+import type { NotificationType } from "@/types/notification";
 import { z } from "zod";
 
 type Params = { params: Promise<{ projectId: string; sprintId: string }> };
@@ -108,54 +112,63 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const body = await request.json();
     const data = updateSchema.parse(body);
 
-    const sprint = await prisma.sprint.update({
-      where: { id: existing.id },
-      data: {
-        ...(data.name !== undefined ? { name: data.name } : {}),
-        ...("goal" in data ? { goal: data.goal ?? null } : {}),
-        ...(data.startDate
-          ? { startDate: new Date(data.startDate) }
-          : {}),
-        ...(data.endDate ? { endDate: new Date(data.endDate) } : {}),
-        ...(data.status ? { status: data.status } : {}),
-      },
-      include: {
-        createdBy: { select: { id: true, name: true } },
-        _count: { select: { issues: true } },
-      },
-    });
-
-    if (
-      data.status &&
+    const shouldNotify =
+      !!data.status &&
       data.status !== existing.status &&
-      (data.status === "ACTIVE" || data.status === "COMPLETED")
-    ) {
+      (data.status === "ACTIVE" || data.status === "COMPLETED");
+
+    let recipients: string[] = [];
+    if (shouldNotify) {
       const assignees = await prisma.issue.findMany({
         where: { sprintId: existing.id, assigneeId: { not: null } },
         select: { assigneeId: true },
         distinct: ["assigneeId"],
       });
-      const recipients = assignees
+      recipients = assignees
         .map((i) => i.assigneeId)
         .filter((id): id is string => !!id && id !== user.userId);
+    }
 
-      if (recipients.length > 0) {
-        const notifType =
-          data.status === "ACTIVE" ? "SPRINT_STARTED" : "SPRINT_COMPLETED";
+    const sprint = await prisma.$transaction(async (tx) => {
+      const updated = await tx.sprint.update({
+        where: { id: existing.id },
+        data: {
+          ...(data.name !== undefined ? { name: data.name } : {}),
+          ...("goal" in data ? { goal: data.goal ?? null } : {}),
+          ...(data.startDate
+            ? { startDate: new Date(data.startDate) }
+            : {}),
+          ...(data.endDate ? { endDate: new Date(data.endDate) } : {}),
+          ...(data.status ? { status: data.status } : {}),
+        },
+        include: {
+          createdBy: { select: { id: true, name: true } },
+          _count: { select: { issues: true } },
+        },
+      });
+
+      if (shouldNotify && recipients.length > 0) {
+        const notifType = (
+          data.status === "ACTIVE" ? "SPRINT_STARTED" : "SPRINT_COMPLETED"
+        ) satisfies NotificationType;
         const titlePrefix =
           data.status === "ACTIVE" ? "스프린트 시작" : "스프린트 완료";
-        await createNotifications(
+        await enqueueNotificationsTx(
+          tx,
           recipients.map((userId) => ({
             userId,
             type: notifType,
-            title: `${titlePrefix}: ${sprint.name}`,
-            message: sprint.goal ?? "",
-            link: `/projects/${project.key}/sprints/${sprint.id}`,
+            title: `${titlePrefix}: ${updated.name}`,
+            message: updated.goal ?? "",
+            link: `/projects/${project.key}/sprints/${updated.id}`,
           }))
         );
       }
-    }
 
+      return updated;
+    });
+
+    if (shouldNotify && recipients.length > 0) triggerNotificationDrain();
     return NextResponse.json({ sprint });
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { createNotifications } from "@/lib/notification";
+import {
+  enqueueNotificationsTx,
+  triggerNotificationDrain,
+} from "@/lib/notification";
 import { z } from "zod";
 
 type Params = { params: Promise<{ projectId: string; issueId: string }> };
@@ -123,30 +126,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       else if (existingIssue.status === "DONE") completedAtUpdate = null;
     }
 
-    const issue = await prisma.issue.update({
-      where: { id: existingIssue.id },
-      data: {
-        ...data,
-        dueDate: data.dueDate === null ? null : data.dueDate ? new Date(data.dueDate) : undefined,
-        ...(completedAtUpdate !== undefined
-          ? { completedAt: completedAtUpdate }
-          : {}),
-        ...(labelIds !== undefined
-          ? { labels: { set: labelIds.map((id) => ({ id })) } }
-          : {}),
-      },
-      include: {
-        assignee: {
-          select: { id: true, name: true, email: true, avatarUrl: true },
-        },
-        reporter: {
-          select: { id: true, name: true, email: true, avatarUrl: true },
-        },
-        labels: true,
-      },
-    });
-
-    // Build activity records for changed fields
     const activityData: {
       issueId: string;
       userId: string;
@@ -229,48 +208,73 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
     }
 
-    if (activityData.length > 0) {
-      await prisma.activity.createMany({ data: activityData });
-    }
-
-    const notifications: Parameters<typeof createNotifications>[0] = [];
-    const issueLink = `/projects/${project.key}/issues/${existingIssue.issueNumber}`;
-    const issueRef = `${project.key}-${existingIssue.issueNumber}`;
-
-    if (
-      "assigneeId" in data &&
-      data.assigneeId &&
-      data.assigneeId !== existingIssue.assigneeId &&
-      data.assigneeId !== user.userId
-    ) {
-      notifications.push({
-        userId: data.assigneeId,
-        type: "ISSUE_ASSIGNED",
-        title: `${issueRef} 이슈가 회원님에게 할당되었습니다`,
-        message: issue.title,
-        link: issueLink,
+    const { issue, hasNotifications } = await prisma.$transaction(async (tx) => {
+      const updated = await tx.issue.update({
+        where: { id: existingIssue.id },
+        data: {
+          ...data,
+          dueDate: data.dueDate === null ? null : data.dueDate ? new Date(data.dueDate) : undefined,
+          ...(completedAtUpdate !== undefined
+            ? { completedAt: completedAtUpdate }
+            : {}),
+          ...(labelIds !== undefined
+            ? { labels: { set: labelIds.map((id) => ({ id })) } }
+            : {}),
+        },
+        include: {
+          assignee: {
+            select: { id: true, name: true, email: true, avatarUrl: true },
+          },
+          reporter: {
+            select: { id: true, name: true, email: true, avatarUrl: true },
+          },
+          labels: true,
+        },
       });
-    }
 
-    if (
-      data.status !== undefined &&
-      data.status !== existingIssue.status &&
-      existingIssue.assigneeId &&
-      existingIssue.assigneeId !== user.userId
-    ) {
-      notifications.push({
-        userId: existingIssue.assigneeId,
-        type: "ISSUE_STATUS_CHANGED",
-        title: `${issueRef} 상태 변경: ${existingIssue.status} → ${data.status}`,
-        message: issue.title,
-        link: issueLink,
-      });
-    }
+      if (activityData.length > 0) {
+        await tx.activity.createMany({ data: activityData });
+      }
 
-    if (notifications.length > 0) {
-      await createNotifications(notifications);
-    }
+      const issueLink = `/projects/${project.key}/issues/${existingIssue.issueNumber}`;
+      const issueRef = `${project.key}-${existingIssue.issueNumber}`;
+      const notifications: Parameters<typeof enqueueNotificationsTx>[1] = [];
 
+      if (
+        "assigneeId" in data &&
+        data.assigneeId &&
+        data.assigneeId !== existingIssue.assigneeId &&
+        data.assigneeId !== user.userId
+      ) {
+        notifications.push({
+          userId: data.assigneeId,
+          type: "ISSUE_ASSIGNED",
+          title: `${issueRef} 이슈가 회원님에게 할당되었습니다`,
+          message: updated.title,
+          link: issueLink,
+        });
+      }
+
+      if (
+        data.status !== undefined &&
+        data.status !== existingIssue.status &&
+        existingIssue.assigneeId &&
+        existingIssue.assigneeId !== user.userId
+      ) {
+        notifications.push({
+          userId: existingIssue.assigneeId,
+          type: "ISSUE_STATUS_CHANGED",
+          title: `${issueRef} 상태 변경: ${existingIssue.status} → ${data.status}`,
+          message: updated.title,
+          link: issueLink,
+        });
+      }
+
+      await enqueueNotificationsTx(tx, notifications);
+      return { issue: updated, hasNotifications: notifications.length > 0 };
+    });
+
+    if (hasNotifications) triggerNotificationDrain();
     return NextResponse.json({ issue });
   } catch (error) {
     if (error instanceof z.ZodError) {

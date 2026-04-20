@@ -459,7 +459,6 @@ ADR-014에서 알림은 API 핸들러 내부에서 `prisma.notification.createMa
 - **proxy.ts 공개 경로**: `/api/cron`도 쿠키 없는 호출이라 JWT 인증 우회 목록에 등록 (ADR-017 webhook과 동일 패턴).
 
 ### 알려진 한계
-- **진정한 트랜잭션 아토믹성은 미보장**: 본 요청 커밋 후 outbox insert가 실패하면 알림 유실 가능. 각 호출 지점을 `prisma.$transaction`으로 감싸는 후속 작업이 필요하지만 현 범위에서는 허용 수준으로 판단.
 - **인라인 드레인의 promise는 응답과 독립 실행**: Next.js/Vercel에서 fire-and-forget이 함수 종료 시점에 잘릴 수 있음 (서버리스 특성). 일일 cron이 이런 케이스를 잡아줌.
 - **일일 cron 지연**: inline이 완전 실패한 행은 최대 24시간 후 재시도. Hobby 플랜 제약상 허용.
 
@@ -470,3 +469,12 @@ ADR-014에서 알림은 API 핸들러 내부에서 `prisma.notification.createMa
 - `vercel.json` cron `0 15 * * *`
 - E2E 4건: 무인증/잘못된 Bearer/빈 배치/트리거→drain→배달 완료
 - 프로덕션 배포 + Vercel Cron 자동 등록 + 401 차단 동작 확인
+
+### 보강 — 2026-04-20 (아토믹성 강화)
+초기 결정 시 "본 요청과 outbox insert의 아토믹성 미보장"을 허용 한계로 두었으나, 본 요청 커밋 후 outbox insert 실패 시 유실/본 요청 롤백 시 유령 알림이 남는 문제를 근본 해결하기 위해 API 전용 Transactional Outbox로 승격.
+
+- `src/lib/notification.ts`: `createNotification`/`createNotifications` 제거, `enqueueNotificationsTx(tx, inputs)`와 `triggerNotificationDrain()` 신설. outbox insert는 호출자의 트랜잭션 안에서만 수행되도록 타입 강제.
+- 3개 트리거 경로를 `prisma.$transaction(async (tx) => …)`로 묶음: 이슈 PATCH(`issue.update` + `activity.createMany` + 알림), 댓글 POST(`comment.create` + `activity.create` + 알림), 스프린트 PATCH(`sprint.update` + 알림).
+- `triggerNotificationDrain()`은 트랜잭션 커밋 성공 후에만 호출하여 인라인 드레인이 커밋된 행을 보도록 보장. 트랜잭션이 롤백되면 outbox 행도 함께 사라짐.
+- 스프린트 PATCH의 경우 대상 assignee 조회는 read이므로 트랜잭션 밖에서 수행해 write-only tx를 유지 (libSQL 단일 라이터 lock 경쟁 최소화).
+- 드레인 호출은 실제 알림 insert가 있었던 경우로 한정(`hasNotifications`, `recipients.length > 0`). 불필요한 outbox 스캔 제거.

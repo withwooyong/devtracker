@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { createNotifications } from "@/lib/notification";
+import {
+  enqueueNotificationsTx,
+  triggerNotificationDrain,
+} from "@/lib/notification";
 import { z } from "zod";
 
 type Params = {
@@ -73,27 +76,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     const body = await request.json();
     const { content } = createSchema.parse(body);
 
-    const comment = await prisma.comment.create({
-      data: {
-        content,
-        issueId: issue.id,
-        authorId: user.userId,
-      },
-      include: {
-        author: {
-          select: { id: true, name: true, email: true, avatarUrl: true },
-        },
-      },
-    });
-
-    await prisma.activity.create({
-      data: {
-        issueId: issue.id,
-        userId: user.userId,
-        action: "COMMENT_ADDED",
-      },
-    });
-
     const recipients = new Set<string>();
     if (issue.assigneeId && issue.assigneeId !== user.userId) {
       recipients.add(issue.assigneeId);
@@ -101,19 +83,47 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (issue.reporterId !== user.userId) {
       recipients.add(issue.reporterId);
     }
-    if (recipients.size > 0) {
-      const plain = content.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
-      await createNotifications(
-        Array.from(recipients).map((userId) => ({
-          userId,
-          type: "ISSUE_COMMENTED",
-          title: `${project.key}-${issue.issueNumber} 에 새 댓글`,
-          message: `${comment.author.name}: ${plain.slice(0, 80)}`,
-          link: `/projects/${project.key}/issues/${issue.issueNumber}`,
-        }))
-      );
-    }
 
+    const comment = await prisma.$transaction(async (tx) => {
+      const created = await tx.comment.create({
+        data: {
+          content,
+          issueId: issue.id,
+          authorId: user.userId,
+        },
+        include: {
+          author: {
+            select: { id: true, name: true, email: true, avatarUrl: true },
+          },
+        },
+      });
+
+      await tx.activity.create({
+        data: {
+          issueId: issue.id,
+          userId: user.userId,
+          action: "COMMENT_ADDED",
+        },
+      });
+
+      if (recipients.size > 0) {
+        const plain = content.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+        await enqueueNotificationsTx(
+          tx,
+          Array.from(recipients).map((userId) => ({
+            userId,
+            type: "ISSUE_COMMENTED",
+            title: `${project.key}-${issue.issueNumber} 에 새 댓글`,
+            message: `${created.author.name}: ${plain.slice(0, 80)}`,
+            link: `/projects/${project.key}/issues/${issue.issueNumber}`,
+          }))
+        );
+      }
+
+      return created;
+    });
+
+    if (recipients.size > 0) triggerNotificationDrain();
     return NextResponse.json({ comment }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
