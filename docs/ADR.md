@@ -373,29 +373,31 @@ Phase 2-1/2-2에서 스키마가 확장(Sprint, Notification, completedAt 추가
 
 ---
 
-## ADR-016: Phase 3-1 파일 첨부 — Vercel Blob (Public)
+## ADR-016: Phase 3-1 파일 첨부 — Vercel Blob (Private + 프록시 다운로드)
 
-**날짜**: 2026-04-20
-**상태**: 채택 (Public 단기), Private+Signed URL로 마이그레이션 예정
+**날짜**: 2026-04-20 (최초 Public 채택) → 2026-04-20 (Private 마이그레이션)
+**상태**: 채택
 
 ### 맥락
-이슈에 이미지/문서 첨부 기능이 필요했다. 파일 저장소 선택지는 Vercel Blob, Cloudflare R2, AWS S3, Supabase Storage 등이 있었다. 접근 제어 수준(Public vs Private+Signed URL)도 결정해야 했다.
+이슈에 이미지/문서 첨부 기능이 필요했다. 파일 저장소 선택지는 Vercel Blob, Cloudflare R2, AWS S3, Supabase Storage 등이 있었다. 초기에는 구현 단순화를 위해 Public store로 시작했으나, 보안 리뷰에서 "URL 유출 시 영구 접근" 문제가 High로 지적되어 같은 세션에서 Private으로 전환.
 
 ### 결정
-Vercel Blob **Public** store를 사용한다. Private + signed URL 방식은 구현 복잡도가 높아 일단 Public으로 시작하고, 보안 리뷰에서 지적된 접근 제어 개선은 별도 세션에서 마이그레이션한다.
+**Vercel Blob Private store + 서버 프록시 다운로드** 방식. 브라우저는 blob URL에 직접 접근할 수 없고, DevTracker API의 `/attachments/[id]/download` 엔드포인트를 경유해 인증 확인 후 blob stream을 받아 중계한다.
 
 ### 근거
-- **저장소 선택**: Vercel 배포 환경이라 통합 부담이 최소, 환경변수 1개(`BLOB_READ_WRITE_TOKEN`)로 동작, 팀 규모 5~20명 기준 무료 티어(1GB) 충분
-- **Public 선택 이유**: 이미지 썸네일 인라인 렌더링에 서명 URL 갱신 로직 불필요, 초기 구현 단순화. 팀 내부 도구라 URL 직접 노출 리스크는 제한적이지만 영구 공개 URL이라는 점은 인지하고 있음.
-- **업로드 제약**: 4MB (Vercel 서버리스 함수 body 제한 ~4.5MB 고려), MIME prefix 화이트리스트, file-type 라이브러리로 magic byte 교차 검증 (선언 MIME 스푸핑 방지)
-- **이슈당 20개 제한**: DoS/쿼터 폭증 방어
-- **Orphan blob 방지**: DB 삽입 실패 시 `del()` 롤백. DELETE 시 blob 삭제 실패는 best-effort로 로그만 남김
+- **저장소 선택**: Vercel 배포 환경이라 통합 부담 최소, 환경변수 1개(`BLOB_READ_WRITE_TOKEN`), 팀 규모 5~20명 기준 무료 티어(1GB) 충분
+- **Private 전환 이유**: `access: "public"` URL은 인증 없이 영구 접근 가능. 퇴사자가 URL 기억 시 접근 통제 불가. Private + 프록시로 모든 다운로드가 로그인 세션을 거침.
+- **프록시 다운로드 방식 선택**: Vercel Blob v2 SDK의 private 접근은 signed URL이 아니라 서버측 `get(url, { access: "private" })` (stream 반환). 브라우저 직접 접근 불가하므로 API 프록시가 유일한 방법.
+- **성능 트레이드오프**: 모든 이미지/파일 다운로드가 Vercel 함수를 거쳐 대역폭 + 콜드 스타트 비용. 팀 도구 규모에선 허용 범위.
+- **업로드 제약**: 4MB (Vercel 서버리스 body 제한), MIME prefix 화이트리스트, file-type magic byte 교차 검증, 이슈당 20개
+- **Orphan blob 방지**: DB 삽입 실패 시 `del()` 롤백. DELETE 시 blob 삭제 실패는 best-effort 로그
 
 ### 결과
 - `Attachment` 모델 + POST(multipart)/DELETE API + 드래그앤드롭 UI
+- 신규 프록시: `GET /api/projects/[projectId]/issues/[issueId]/attachments/[attachmentId]/download` — 인증 후 `get()`으로 stream 중계, `Cache-Control: private, max-age=60`
 - sanitize된 filename을 DB에 저장 (원본 보존이 아니라 안전성 우선)
-- E2E 5건: 업로드/크기 제한/MIME 거부/리스트 렌더/삭제
-- **미해결**: Public URL은 퇴사자가 URL을 기억하고 있으면 영구 접근 가능. 장기적으로 Private + signed URL 마이그레이션 필요
+- 초기 Public store 삭제 + Private store 재생성 (사용자 액션), Attachment 레코드 전체 삭제 (DB/Turso)
+- E2E 7건: 업로드/크기 제한/MIME 거부/리스트 렌더/삭제 + 프록시 바이트 일치 검증 + 무인증 접근 401
 
 ---
 

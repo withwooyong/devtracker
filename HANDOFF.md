@@ -1,13 +1,13 @@
 # Session Handoff
 
-> Last updated: 2026-04-20 (KST, 2차)
+> Last updated: 2026-04-20 (KST, 3차)
 > Branch: `main`
-> Latest commit: `0bb242f` — webhook 프록시 public path 보정
+> Latest commit: `77b60a7` — 첨부 Private Blob 마이그레이션
 > Production: https://devtracker-dusky.vercel.app
 
 ## Current Status
 
-Phase 3 전체 완료 — 파일 첨부(Vercel Blob) + GitHub Webhook 연동. E2E 37/37 통과, 프로덕션 배포 및 GitHub webhook ping 200 확인 완료.
+Phase 3 전체 완료 + 분리 이슈 2건 (백로그 limit, Private Blob 마이그레이션) 처리. E2E 39/39 통과, 프로덕션 배포 + GitHub webhook ping 200 + Private Blob 프록시 다운로드 검증 완료.
 
 ## Completed This Session (2026-04-20, 2차)
 
@@ -37,33 +37,35 @@ f4548ac  알림 시스템 리뷰 지적사항 반영
 9bdf6b0  Phase 2-1 스프린트 기능 추가: 모델/API/UI + 번다운 차트
 ```
 
-## Key Decisions Made (Phase 3)
+## Key Decisions Made (Phase 3 + 분리 이슈)
 
-- **Vercel Blob Public 사용**: 초기 구현 단순화를 위해 `access: "public"`. Private + signed URL은 별도 세션에서 마이그레이션 예정 (보안 리뷰 H-2 항목)
+- **Vercel Blob Private + 프록시 다운로드** (ADR-016 업데이트): `access: "private"`로 업로드, `/api/.../attachments/[id]/download` 엔드포인트가 인증 후 blob stream 중계. 브라우저는 Blob URL 직접 접근 불가
 - **MIME 이중 검증**: 클라이언트 선언 Content-Type + file-type 라이브러리 magic byte. 둘 중 하나만 통과해도 거부
 - **Webhook 전역 secret**: 프로젝트별 GitHub 설정 없이 `GITHUB_WEBHOOK_SECRET` 하나로 운영. 다중 레포 필요 시 ProjectSettings 모델 확장
 - **proxy.ts 공개 경로 확장**: `/api/webhooks`는 JWT 인증 대신 HMAC 서명으로 신뢰성 확보
 - **Webhook 머지 Activity**: `userId`를 이슈 reporter로 기록 (GitHub ↔ DevTracker 사용자 매핑 미구현)
+- **백로그 조회**: issues API `?sprintId=none` 필터로 클라이언트 필터링 제거, 100개 상한 해결
 
 ## Known Issues
 
-- **Vercel Blob Public URL 영구 공개**: 퇴사자가 URL 기억 시 접근 가능 — Private + signed URL 마이그레이션 대기
 - **GitHub 사용자 매핑 없음**: PR 머지로 인한 이슈 상태 변경 Activity가 reporter 명의
-- **Prisma CLI `libsql://` 미지원**, **Turso FK 드리프트**, **백로그 100개 제한** (기존)
+- **첨부 다운로드가 Vercel 함수 경유**: 직접 URL 대비 콜드 스타트 + 대역폭 비용 (팀 규모엔 허용)
+- **Prisma CLI `libsql://` 미지원**, **Turso FK 드리프트** (기존)
 - **JWT role DB 미동기**, **refresh token 서버측 무효화 불가** (기존)
 - **프로젝트 멤버십 미검증** (의도 — 모든 인증 사용자가 모든 프로젝트 접근)
 - **이모지 → SVG 일관성 미점검**
 
 ## Pending Improvements (분리 이슈)
 
-- [ ] Vercel Blob Private + signed URL 마이그레이션
-- [ ] 알림 Outbox 패턴 (best-effort → 신뢰성 있게)
-- [ ] 백로그 API에 `sprintId=none` 필터 추가 (100개 제한 해결)
-- [ ] Rate limiting (알림/첨부/webhook 엔드포인트)
+- [ ] 알림 Outbox 패턴 (best-effort → 신뢰성 있게) — 스키마/워커 설계 필요
+- [ ] Rate limiting (알림/첨부/webhook 엔드포인트) — Upstash Redis 또는 Vercel Edge Config
 - [ ] 드롭다운 Link 클릭 mutation.onSuccess 후 router.push
 - [ ] GitHub push 이벤트 지원 (커밋 ↔ 이슈 자동 연결, Phase 4+)
 - [ ] 프로젝트 설정 페이지 (`/projects/[key]/settings`) — 프로젝트별 GitHub 레포 연결
 - [ ] GitHub 사용자 ↔ DevTracker 사용자 매핑
+- [ ] Orphan blob cleanup 배치 (head list 대조)
+- [x] ~~Vercel Blob Private 마이그레이션~~ — 완료 (77b60a7)
+- [x] ~~백로그 API sprintId=none 필터~~ — 완료 (287a804)
 
 ## Context for Next Session
 
