@@ -17,11 +17,12 @@ export async function GET(
   const status = url.searchParams.get("status");
   const priority = url.searchParams.get("priority");
   const assigneeId = url.searchParams.get("assigneeId");
+  const sprintId = url.searchParams.get("sprintId");
   const search = url.searchParams.get("search");
   const rawPage = parseInt(url.searchParams.get("page") || "1", 10);
   const rawLimit = parseInt(url.searchParams.get("limit") || "50", 10);
   const page = isNaN(rawPage) || rawPage < 1 ? 1 : rawPage;
-  const limit = isNaN(rawLimit) || rawLimit < 1 ? 50 : Math.min(rawLimit, 100);
+  const limit = isNaN(rawLimit) || rawLimit < 1 ? 50 : Math.min(rawLimit, 200);
 
   const project = await prisma.project.findFirst({
     where: { OR: [{ id: projectId }, { key: projectId }] },
@@ -37,6 +38,8 @@ export async function GET(
   if (status && status !== "ALL") where.status = status;
   if (priority && priority !== "ALL") where.priority = priority;
   if (assigneeId && assigneeId !== "ALL") where.assigneeId = assigneeId;
+  if (sprintId === "none") where.sprintId = null;
+  else if (sprintId && sprintId !== "ALL") where.sprintId = sprintId;
   if (search) {
     where.OR = [
       { title: { contains: search } },

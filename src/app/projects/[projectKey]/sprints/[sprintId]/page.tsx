@@ -58,10 +58,12 @@ export default function SprintDetailPage({
   const { data: backlogData } = useQuery<{ issues: Issue[] }>({
     queryKey: ["backlog-issues", projectKey],
     queryFn: () =>
-      fetch(`/api/projects/${projectKey}/issues?limit=100`).then((r) => {
-        if (!r.ok) throw new Error("fetch failed");
-        return r.json();
-      }),
+      fetch(`/api/projects/${projectKey}/issues?sprintId=none&limit=200`).then(
+        (r) => {
+          if (!r.ok) throw new Error("fetch failed");
+          return r.json();
+        }
+      ),
   });
 
   const updateSprint = useMutation({
@@ -143,9 +145,7 @@ export default function SprintDetailPage({
     return Math.round((done / issues.length) * 100);
   }, [issues]);
 
-  const backlogIssues = (backlogData?.issues ?? []).filter(
-    (i) => !i.sprintId
-  );
+  const backlogIssues = backlogData?.issues ?? [];
 
   return (
     <MainLayout>
