@@ -25,6 +25,7 @@ model User {
   savedFilters   SavedFilter[]
   createdSprints Sprint[]       @relation("SprintCreator")
   notifications  Notification[]
+  attachments    Attachment[]
 }
 
 model Project {
@@ -64,9 +65,10 @@ model Issue {
   assignee   User?      @relation("Assignee", fields: [assigneeId], references: [id])
   reporter   User       @relation("Reporter", fields: [reporterId], references: [id])
   sprint     Sprint?    @relation(fields: [sprintId], references: [id], onDelete: SetNull)
-  comments   Comment[]
-  labels     Label[]    @relation("IssueLabels")
-  activities Activity[]
+  comments    Comment[]
+  labels      Label[]      @relation("IssueLabels")
+  activities  Activity[]
+  attachments Attachment[]
 
   @@unique([projectId, issueNumber])
 }
@@ -115,7 +117,7 @@ model Activity {
   id        String   @id @default(uuid())
   issueId   String
   userId    String
-  action    String   // CREATED | STATUS_CHANGED | PRIORITY_CHANGED | ASSIGNEE_CHANGED | LABEL_ADDED | LABEL_REMOVED | COMMENT_ADDED | SPRINT_CHANGED
+  action    String   // CREATED | STATUS_CHANGED | PRIORITY_CHANGED | ASSIGNEE_CHANGED | LABEL_ADDED | LABEL_REMOVED | COMMENT_ADDED | SPRINT_CHANGED | ATTACHMENT_ADDED | ATTACHMENT_REMOVED
   field     String?
   oldValue  String?
   newValue  String?
@@ -123,6 +125,22 @@ model Activity {
 
   issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id])
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  issueId   String
+  userId    String
+  filename  String
+  url       String
+  size      Int
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@index([issueId, createdAt])
 }
 
 model Notification {

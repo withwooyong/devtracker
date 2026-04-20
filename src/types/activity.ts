@@ -5,7 +5,10 @@ export type ActivityAction =
   | "ASSIGNEE_CHANGED"
   | "LABEL_ADDED"
   | "LABEL_REMOVED"
-  | "COMMENT_ADDED";
+  | "COMMENT_ADDED"
+  | "SPRINT_CHANGED"
+  | "ATTACHMENT_ADDED"
+  | "ATTACHMENT_REMOVED";
 
 export interface Activity {
   id: string;
@@ -27,4 +30,7 @@ export const ACTION_LABELS: Record<ActivityAction, string> = {
   LABEL_ADDED: "라벨을 추가했습니다",
   LABEL_REMOVED: "라벨을 제거했습니다",
   COMMENT_ADDED: "댓글을 작성했습니다",
+  SPRINT_CHANGED: "스프린트를 변경했습니다",
+  ATTACHMENT_ADDED: "파일을 첨부했습니다",
+  ATTACHMENT_REMOVED: "첨부파일을 제거했습니다",
 };

@@ -21,10 +21,10 @@ export async function GET(_request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "프로젝트 없음" }, { status: 404 });
   }
 
-  const issueNumber = parseInt(issueId);
-  const target = isNaN(issueNumber)
-    ? await prisma.issue.findFirst({ where: { id: issueId, projectId: project.id } })
-    : await prisma.issue.findUnique({ where: { projectId_issueNumber: { projectId: project.id, issueNumber } } });
+  const isNumeric = /^\d+$/.test(issueId);
+  const target = isNumeric
+    ? await prisma.issue.findUnique({ where: { projectId_issueNumber: { projectId: project.id, issueNumber: parseInt(issueId, 10) } } })
+    : await prisma.issue.findFirst({ where: { id: issueId, projectId: project.id } });
 
   if (!target) {
     return NextResponse.json({ error: "이슈를 찾을 수 없습니다." }, { status: 404 });
@@ -89,14 +89,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const body = await request.json();
     const { labelIds, ...data } = updateSchema.parse(body);
 
-    const issueNumber = parseInt(issueId);
-    const existingIssue = isNaN(issueNumber)
-      ? await prisma.issue.findFirst({
-          where: { id: issueId, projectId: project.id },
+    const isNumeric = /^\d+$/.test(issueId);
+    const existingIssue = isNumeric
+      ? await prisma.issue.findUnique({
+          where: { projectId_issueNumber: { projectId: project.id, issueNumber: parseInt(issueId, 10) } },
           include: { labels: { select: { id: true } } },
         })
-      : await prisma.issue.findUnique({
-          where: { projectId_issueNumber: { projectId: project.id, issueNumber } },
+      : await prisma.issue.findFirst({
+          where: { id: issueId, projectId: project.id },
           include: { labels: { select: { id: true } } },
         });
 

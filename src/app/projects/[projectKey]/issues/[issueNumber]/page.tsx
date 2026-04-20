@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ActivityTimeline } from "@/components/common/activity-timeline";
+import { AttachmentList } from "@/components/common/attachment-list";
 import Link from "next/link";
 import type { Issue } from "@/types/issue";
 import type { User } from "@/types/user";
@@ -213,6 +214,12 @@ export default function IssueDetailPage({
                 )}
               </div>
             )}
+
+            <AttachmentList
+              projectKey={projectKey}
+              issueNumber={issue.issueNumber}
+              issueId={issue.id}
+            />
 
             {/* Tab switcher */}
             <div className="space-y-4">

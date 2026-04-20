@@ -47,3 +47,4 @@ prisma/dev.db-journal
 # playwright
 /playwright-report/
 /test-results/
+.env*.local
