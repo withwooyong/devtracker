@@ -74,7 +74,12 @@ export function NotificationDropdown() {
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open) {
+            queryClient.invalidateQueries({ queryKey: ["notifications"] });
+          }
+          setOpen((v) => !v);
+        }}
         aria-label="알림"
         className="relative p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100"
       >

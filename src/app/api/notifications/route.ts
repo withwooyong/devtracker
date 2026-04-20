@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { z } from "zod";
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
   const limit =
     isNaN(rawLimit) || rawLimit < 1 ? 30 : Math.min(rawLimit, 100);
 
-  const where: Record<string, unknown> = { userId: user.userId };
+  const where: Prisma.NotificationWhereInput = { userId: user.userId };
   if (unreadOnly) where.isRead = false;
 
   const [notifications, unreadCount] = await Promise.all([
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
 }
 
 const patchSchema = z.object({
-  ids: z.array(z.string()).optional(),
+  ids: z.array(z.string()).max(100).optional(),
   markAll: z.boolean().optional(),
 });
 

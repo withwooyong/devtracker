@@ -102,12 +102,13 @@ export async function POST(request: NextRequest, { params }: Params) {
       recipients.add(issue.reporterId);
     }
     if (recipients.size > 0) {
+      const plain = content.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
       await createNotifications(
         Array.from(recipients).map((userId) => ({
           userId,
           type: "ISSUE_COMMENTED",
           title: `${project.key}-${issue.issueNumber} 에 새 댓글`,
-          message: `${comment.author.name}: ${content.slice(0, 80)}`,
+          message: `${comment.author.name}: ${plain.slice(0, 80)}`,
           link: `/projects/${project.key}/issues/${issue.issueNumber}`,
         }))
       );
