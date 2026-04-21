@@ -4,4 +4,5 @@ export interface User {
   name: string;
   role: "ADMIN" | "MEMBER";
   avatarUrl?: string | null;
+  githubLogin?: string | null;
 }

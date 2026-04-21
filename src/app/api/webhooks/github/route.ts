@@ -29,8 +29,46 @@ interface PullRequestPayload {
     merged: boolean;
     state: string;
     head: { ref: string };
+    user?: { login: string; id: number };
   };
   repository?: { full_name: string };
+}
+
+// PR 작성자를 DevTracker User로 매핑. githubId 우선(로그인 변경 내성), 없으면 githubLogin로 매칭.
+// login으로 매칭됐을 때는 항상 githubId를 최신 값으로 덮어써서 다음 매칭부터는 id 경로로 즉시 찾히도록 한다.
+async function resolvePullRequestAuthor(
+  prUser: { login: string; id: number } | undefined
+): Promise<{ id: string } | null> {
+  if (!prUser) return null;
+  const byId = await prisma.user.findUnique({
+    where: { githubId: prUser.id },
+    select: { id: true },
+  });
+  if (byId) return byId;
+
+  const byLogin = await prisma.user.findUnique({
+    where: { githubLogin: prUser.login },
+    select: { id: true, githubId: true },
+  });
+  if (byLogin) {
+    if (byLogin.githubId !== prUser.id) {
+      await prisma.user
+        .update({
+          where: { id: byLogin.id },
+          data: { githubId: prUser.id },
+        })
+        .catch(() => {
+          // 다른 사용자가 동일 githubId를 선점했을 경우 unique 충돌. 이번 요청은 login 매칭으로 반환하고
+          // 정합성은 해당 사용자 측 수동 정리에 맡긴다 (경고 로그만 남김).
+          console.warn(
+            "[github-webhook] githubId 업데이트 실패(unique 충돌 가능)",
+            { userId: byLogin.id, prUserId: prUser.id, prUserLogin: prUser.login }
+          );
+        });
+    }
+    return { id: byLogin.id };
+  }
+  return null;
 }
 
 // 이슈 키 패턴: DEV-123, ABC-1 등
@@ -142,6 +180,9 @@ export async function POST(request: NextRequest) {
   const status = mapPrStatus(payload.action, pr.merged, pr.state);
   const shouldCloseIssue = pr.merged; // 머지되면 연결된 이슈 상태를 DONE으로
 
+  // PR 작성자를 DevTracker User로 매핑. 실패하면 reporter 폴백.
+  const prAuthor = await resolvePullRequestAuthor(pr.user);
+
   let matched = 0;
   const skippedKeys: string[] = [];
   for (const { key, number } of keys) {
@@ -193,11 +234,11 @@ export async function POST(request: NextRequest) {
         where: { id: issue.id },
         data: { status: "DONE", completedAt: new Date() },
       });
-      // System activity: reporter가 변경한 것으로 기록 (사용자 매핑 기능 없으므로)
+      // Activity userId: PR 작성자 매칭 성공 시 그 user, 실패 시 reporter 폴백
       await prisma.activity.create({
         data: {
           issueId: issue.id,
-          userId: issue.reporterId,
+          userId: prAuthor?.id ?? issue.reporterId,
           action: "STATUS_CHANGED",
           field: "status",
           oldValue: issue.status,
@@ -224,6 +265,7 @@ export async function POST(request: NextRequest) {
     action: payload.action,
     mode,
     secretSource,
+    prAuthorMatched: Boolean(prAuthor),
     ...(skippedKeys.length > 0 ? { skippedKeys } : {}),
   });
 }

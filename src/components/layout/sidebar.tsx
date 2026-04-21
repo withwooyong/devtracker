@@ -48,9 +48,19 @@ export function Sidebar() {
               <p className="text-xs text-gray-400 truncate">{user.email}</p>
             </div>
           </div>
+          <Link
+            href="/settings"
+            className={`mt-3 block text-center text-xs py-1.5 border rounded transition-colors ${
+              pathname.startsWith("/settings")
+                ? "border-blue-500 text-white"
+                : "border-gray-700 text-gray-400 hover:text-white hover:border-gray-600"
+            }`}
+          >
+            내 프로필
+          </Link>
           <button
             onClick={logout}
-            className="mt-3 w-full text-xs text-gray-400 hover:text-white py-1.5 border border-gray-700 rounded hover:border-gray-600 transition-colors"
+            className="mt-2 w-full text-xs text-gray-400 hover:text-white py-1.5 border border-gray-700 rounded hover:border-gray-600 transition-colors"
           >
             로그아웃
           </button>
