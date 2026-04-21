@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ProjectTabs } from "@/components/layout/project-tabs";
+import { IssueCard } from "@/components/issues/issue-card";
 import Link from "next/link";
 import { StatusBadge, PriorityBadge } from "@/components/common/status-badge";
 import { useFilterStore } from "@/stores/filter-store";
@@ -145,13 +146,13 @@ export default function ProjectIssuePage({
         </div>
 
         {/* Filters */}
-        <div className="bg-white p-3 rounded-lg border border-gray-200 mb-4 flex gap-3 items-center flex-wrap">
+        <div className="bg-white p-3 rounded-lg border border-gray-200 mb-4 flex flex-col md:flex-row md:items-center gap-2 md:gap-3 md:flex-wrap">
           {/* Saved filters dropdown */}
-          <div className="relative">
+          <div className="relative w-full md:w-auto">
             <button
               type="button"
               onClick={() => setShowFiltersDropdown((v) => !v)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"
+              className="w-full md:w-auto px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between md:justify-start gap-1.5"
             >
               저장된 필터
               <svg
@@ -164,7 +165,7 @@ export default function ProjectIssuePage({
               </svg>
             </button>
             {showFiltersDropdown && (
-              <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg min-w-48 py-1">
+              <div className="absolute left-0 right-0 md:right-auto top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg md:min-w-48 py-1">
                 {savedFilters.length === 0 ? (
                   <p className="px-3 py-2 text-xs text-gray-400">저장된 필터가 없습니다.</p>
                 ) : (
@@ -208,12 +209,12 @@ export default function ProjectIssuePage({
             placeholder="검색..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors w-48"
+            className="w-full md:w-48 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           />
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as IssueStatus | "ALL")}
-            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+            className="w-full md:w-auto px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           >
             <option value="ALL">모든 상태</option>
             <option value="TODO">할 일</option>
@@ -224,7 +225,7 @@ export default function ProjectIssuePage({
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value as IssuePriority | "ALL")}
-            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+            className="w-full md:w-auto px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           >
             <option value="ALL">모든 우선순위</option>
             <option value="CRITICAL">긴급</option>
@@ -235,7 +236,7 @@ export default function ProjectIssuePage({
           <select
             value={assigneeId}
             onChange={(e) => setAssigneeId(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+            className="w-full md:w-auto px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           >
             <option value="ALL">모든 담당자</option>
             {usersData?.users?.map((u) => (
@@ -250,7 +251,7 @@ export default function ProjectIssuePage({
             <button
               type="button"
               onClick={() => setShowSaveForm(true)}
-              className="px-3 py-1.5 border border-blue-300 text-blue-600 rounded-lg text-sm hover:bg-blue-50 transition-colors"
+              className="w-full md:w-auto px-3 py-1.5 border border-blue-300 text-blue-600 rounded-lg text-sm hover:bg-blue-50 transition-colors"
             >
               필터 저장
             </button>
@@ -258,14 +259,14 @@ export default function ProjectIssuePage({
 
           {/* Inline save form */}
           {showSaveForm && (
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex flex-col md:flex-row md:items-center gap-2 md:flex-wrap">
               <input
                 type="text"
                 placeholder="필터 이름"
                 value={filterName}
                 onChange={(e) => setFilterName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSaveFilter(); }}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors w-36"
+                className="w-full md:w-36 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
                 autoFocus
               />
               <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
@@ -295,89 +296,97 @@ export default function ProjectIssuePage({
             </div>
           )}
 
-          <span className="text-xs text-gray-500 ml-auto">
+          <span className="text-xs text-gray-500 md:ml-auto">
             총 {data?.total ?? 0}개
           </span>
         </div>
 
-        {/* Issue Table */}
+        {/* Issue list */}
         {isLoading ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
           </div>
-        ) : (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 border-b text-left text-xs font-medium text-gray-500 uppercase">
-                  <th className="px-4 py-3 w-16">#</th>
-                  <th className="px-4 py-3">제목</th>
-                  <th className="px-4 py-3 w-24">상태</th>
-                  <th className="px-4 py-3 w-24">우선순위</th>
-                  <th className="px-4 py-3 w-28">담당자</th>
-                  <th className="px-4 py-3 w-28">생성일</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data?.issues?.map((issue) => (
-                  <tr
-                    key={issue.id}
-                    className="border-b last:border-b-0 hover:bg-gray-50"
-                  >
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {projectKey}-{issue.issueNumber}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
-                        className="text-sm font-medium text-gray-900 hover:text-blue-600"
-                      >
-                        {issue.title}
-                      </Link>
-                      {issue.labels && issue.labels.length > 0 && (
-                        <div className="flex gap-1 mt-1">
-                          {issue.labels.map((label) => (
-                            <span
-                              key={label.id}
-                              className="inline-flex px-1.5 py-0.5 rounded text-xs"
-                              style={{
-                                backgroundColor: label.color + "20",
-                                color: label.color,
-                              }}
-                            >
-                              {label.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={issue.status} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <PriorityBadge priority={issue.priority} />
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {issue.assignee?.name ?? "-"}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">
-                      {new Date(issue.createdAt).toLocaleDateString("ko-KR")}
-                    </td>
-                  </tr>
-                ))}
-                {(!data?.issues || data.issues.length === 0) && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-4 py-12 text-center text-gray-500 text-sm"
-                    >
-                      이슈가 없습니다.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+        ) : !data?.issues || data.issues.length === 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200 px-4 py-12 text-center text-gray-500 text-sm">
+            이슈가 없습니다.
           </div>
+        ) : (
+          <>
+            {/* Mobile card list */}
+            <div className="md:hidden space-y-2">
+              {data.issues.map((issue) => (
+                <IssueCard
+                  key={issue.id}
+                  issue={issue}
+                  projectKey={projectKey}
+                />
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-4 py-3 w-16">#</th>
+                    <th className="px-4 py-3">제목</th>
+                    <th className="px-4 py-3 w-24">상태</th>
+                    <th className="px-4 py-3 w-24">우선순위</th>
+                    <th className="px-4 py-3 w-28">담당자</th>
+                    <th className="px-4 py-3 w-28">생성일</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.issues.map((issue) => (
+                    <tr
+                      key={issue.id}
+                      className="border-b last:border-b-0 hover:bg-gray-50"
+                    >
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {projectKey}-{issue.issueNumber}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
+                          className="text-sm font-medium text-gray-900 hover:text-blue-600"
+                        >
+                          {issue.title}
+                        </Link>
+                        {issue.labels && issue.labels.length > 0 && (
+                          <div className="flex gap-1 mt-1">
+                            {issue.labels.map((label) => (
+                              <span
+                                key={label.id}
+                                className="inline-flex px-1.5 py-0.5 rounded text-xs"
+                                style={{
+                                  backgroundColor: label.color + "20",
+                                  color: label.color,
+                                }}
+                              >
+                                {label.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={issue.status} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <PriorityBadge priority={issue.priority} />
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {issue.assignee?.name ?? "-"}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {new Date(issue.createdAt).toLocaleDateString("ko-KR")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </MainLayout>
