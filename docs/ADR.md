@@ -604,3 +604,58 @@ ADR-020에서 `Project.githubRepo` 기반 하이브리드 라우팅을 도입했
 - secret 로테이션 UI/감사 로그 (누가 언제 변경했는지)
 - 전역 secret 역시 프로젝트별 secret처럼 UI에서 관리하도록 통합(옵션)
 - GitHub 사용자 ↔ DevTracker 사용자 매핑 (PR 머지 Activity가 reporter 명의)
+
+---
+
+## ADR-022: GitHub 사용자 ↔ DevTracker 사용자 매핑
+
+**날짜**: 2026-04-21
+**상태**: 채택
+
+### 맥락
+ADR-017 도입 이후 PR 머지로 인한 이슈 상태 변경(STATUS_CHANGED Activity)은 실제 PR 작성자와 무관하게 **이슈 reporter 명의**로 기록됐다. 기록이 실제 행위자와 달라 활동 로그·알림의 신뢰도가 떨어졌고, 누가 어떤 이슈를 실제로 마무리했는지 추적이 불가능했다. OAuth 없이 self-service로 식별자를 연결할 방법이 필요했다.
+
+### 결정
+**User 모델에 GitHub 식별자를 추가**하고, webhook 처리 중 PR 작성자를 DevTracker user로 매핑한다. OAuth는 도입하지 않고, 사용자가 본인 프로필 페이지에서 GitHub 로그인을 수동 등록한다.
+
+1. **스키마**: `User.githubLogin String? @unique`, `User.githubId Int? @unique` 추가.
+2. **매핑 규칙** (`resolvePullRequestAuthor`):
+   - (a) `githubId` 완전 일치로 우선 조회
+   - (b) 없으면 `githubLogin` 완전 일치로 조회
+   - (c) login 매칭 성공 시 해당 user의 `githubId`를 PR payload 값으로 **항상 최신화** (로그인 변경 내성 + 다음 번엔 id 경로로 즉시 매칭)
+   - (d) 어느 경로로도 매칭 실패 시 `null` 반환 → `Activity.userId`는 `issue.reporterId`로 폴백
+3. **API**: `PATCH /api/auth/me` 신설 — 본인 `githubLogin`(GitHub 로그인 정규식 검증) / `name` 셀프 업데이트. 중복은 insert 전 `findUnique` 선검사로 409 응답(libSQL 어댑터 경유 P2002 코드가 환경 의존적인 문제 회피).
+4. **관측성**: webhook 응답에 `prAuthorMatched: boolean` 필드 추가.
+5. **UI**: `/settings` 사용자 프로필 페이지 신설(`src/app/settings/page.tsx`). 사이드바 사용자 블록에 "내 프로필" 링크.
+
+### 근거
+- **OAuth 없이 시작**: 5~20명 팀 도구로 OAuth 서버 운영 부담은 과잉. self-service 문자열 입력이면 충분.
+- **`githubId` 자동 백필**: login은 사용자가 임의 변경 가능(깃허브 프로필 username 변경). 숫자 `id`는 불변 — 한 번 매칭되면 login 변경에도 매칭이 유지됨.
+- **`githubId`를 매번 덮어쓰는 이유**: 매핑 규칙의 idempotency 보장. 과거 스테일 값이 남아있던 테스트·운영 시나리오에서도 최신 payload가 진실이 되도록 강제. 드문 경우 unique 충돌 시 `console.warn`으로 노출하고 이번 요청은 login 매칭 결과로 응답(사용자 측 수동 정리 유도).
+- **409 선검사**: Prisma P2002는 어댑터/버전에 따라 error shape이 달라 catch 기반 감지는 취약. 기존 `projects/route.ts`/`auth/register/route.ts`와 동일하게 pre-insert 확인 패턴을 따름.
+- **폴백 투명성**: 매핑 실패를 숨기지 않고 `prAuthorMatched: false`로 응답에 명시 → 운영·테스트에서 "왜 이 PR이 내 이름으로 안 찍혔지"를 즉시 확인 가능.
+- **보안**: 자기 프로필만 수정(`payload.userId == updated.id`). 타인 프로필 수정 경로 없음. Admin UI는 후속.
+
+### 결과
+- `prisma/schema.prisma`: `User.githubLogin`, `User.githubId` unique nullable 필드 추가. 로컬 SQLite + Turso ALTER + unique index 생성.
+- `src/app/api/auth/me/route.ts`: `GET` 응답에 `githubLogin` 포함 + `PATCH` 엔드포인트 신설(정규식/길이 검증 + 409 선검사).
+- `src/app/api/webhooks/github/route.ts`:
+  - `PullRequestPayload.pull_request.user?: { login, id }` 추가
+  - `resolvePullRequestAuthor()` 함수 추가
+  - `Activity.userId`를 `prAuthor?.id ?? issue.reporterId`로 변경
+  - 응답 payload에 `prAuthorMatched` 필드 추가
+- `src/app/settings/page.tsx`: 사용자 프로필 페이지 신설(이메일·이름 read-only + GitHub 로그인 편집 + 저장 후 쿼리 무효화).
+- `src/components/layout/sidebar.tsx`: "내 프로필" 링크 추가(현재 경로 강조 스타일 포함).
+- `src/types/user.ts`: `githubLogin?: string | null` 필드 추가.
+- E2E Journey 13 × 6건 추가 (PATCH 라운드트립, 중복 409, 형식 400, 매칭 명의 Activity, reporter 폴백, login 매칭 시 `githubId` 자동 저장 후 id 단독 매칭).
+
+### 대안
+- **OAuth 연동**: 사용자 경험은 좋지만 시크릿 관리·콜백 엔드포인트·세션 머지 비용이 크다. self-service로 우선 충분.
+- **이메일 도메인 휴리스틱**: GitHub 이메일이 프로필 공개 여부에 좌우되고, 팀 이메일(`@yanadoocorp.com`)과 GitHub noreply가 달라 현실성 낮음.
+- **관리자 일괄 매핑 UI**: 초기엔 본인이 직접 등록하는 편이 정확. 후속 개선 후보.
+
+### 남겨둔 후속
+- GitHub push 이벤트 지원 시 commit 저자 매핑(동일 규칙 재사용 가능)
+- 관리자용 매핑 관리 화면(admin이 다른 사용자의 githubLogin 조회/수정/해제)
+- 매핑 변경 감사 로그
+- GitHub OAuth로 자동 매핑 전환(원할 경우)

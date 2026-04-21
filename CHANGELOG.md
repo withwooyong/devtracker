@@ -3,6 +3,31 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-21] GitHub 사용자 매핑
+
+### Added
+- `User.githubLogin String? @unique`, `User.githubId Int? @unique` 필드 추가 (로컬 SQLite + Turso ALTER + unique index)
+- `PATCH /api/auth/me` 신설: 본인 `githubLogin`(GitHub 로그인 정규식 검증, 1~39자) / `name` 셀프 업데이트. 중복 선검사로 409 응답
+- `src/app/api/webhooks/github/route.ts`: `resolvePullRequestAuthor()` — `githubId → githubLogin` 순 매칭. login 매칭 시 `githubId`를 항상 최신화하여 로그인 변경 내성 확보. 매칭 성공 시 `Activity.userId`가 매핑된 user, 실패 시 `issue.reporterId` 폴백
+- webhook 응답에 `prAuthorMatched: boolean` 필드 추가 (운영·테스트 관측성)
+- `/settings` 사용자 프로필 페이지 신설: 이메일·이름 read-only + GitHub 로그인 편집 + 저장 후 `auth/me` 쿼리 무효화
+- 사이드바 사용자 블록에 "내 프로필" 링크 추가(현재 경로 강조 스타일)
+- `src/types/user.ts`에 `githubLogin?: string | null` 필드 추가
+- E2E Journey 13 × 6건: PATCH 라운드트립, 중복 409, 형식 400, 매칭된 PR → Activity가 매핑된 user 명의, 알 수 없는 PR → reporter 폴백, login 매칭 시 `githubId` 자동 저장 후 id 단독으로도 매칭 — 총 60개
+- ADR-022 신규 (GitHub 사용자 매핑 결정 기록)
+
+### Changed
+- `GET /api/auth/me` 응답에 `githubLogin` 포함 (사용자 프로필 페이지 초기값 렌더링용)
+- `PullRequestPayload.pull_request.user?: { login: string; id: number }` 타입 추가
+- `docs/user-guide.md` 10-4 섹션 신설(GitHub 계정 연결·자동 매핑 설명), 사이드바 네비게이션 목록에 "내 프로필" 추가
+- `docs/e2e-testing-guide.md` 54개/12 Journey → 60개/13 Journey (Journey 13 추가)
+
+### Security
+- 자기 프로필 외 수정 경로 없음 — `PATCH /api/auth/me`는 토큰의 `userId`로만 update. 타인 `githubLogin` 변경 불가
+- 중복 `githubLogin` pre-insert 검사로 409 응답 — libSQL 어댑터의 P2002 에러 shape 의존 회피
+
+---
+
 ## [2026-04-21] GitHub webhook 프로젝트별 secret
 
 ### Added
