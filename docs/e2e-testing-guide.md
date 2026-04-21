@@ -46,7 +46,7 @@ tests/e2e/
 playwright.config.ts               # Playwright 설정
 ```
 
-## 현재 테스트 목록 (68개, 15개 Journey — 10b/10c/14b 하위 묶음 포함)
+## 현재 테스트 목록 (69개, 15개 Journey — 10b/10c/14b 하위 묶음 포함)
 
 | Journey | Spec 파일 | 테스트 수 |
 |---------|-----------|-----------|
@@ -54,7 +54,7 @@ playwright.config.ts               # Playwright 설정
 | 2. 대시보드 | dashboard.spec.ts | 2 |
 | 4. 프로젝트 네비게이션 | project-navigation.spec.ts | 2 |
 | 5. 리치 텍스트 에디터 | rich-editor.spec.ts | 4 |
-| 6. 이슈 활동 로그 | activity-log.spec.ts | 4 |
+| 6. 이슈 활동 로그 | activity-log.spec.ts | 5 |
 | 7. 저장된 필터 | saved-filters.spec.ts | 6 |
 | 8. 스프린트 라이프사이클 | sprints.spec.ts | 6 |
 | 9. 이슈 첨부파일 (Vercel Blob Private) | attachments.spec.ts | 7 |

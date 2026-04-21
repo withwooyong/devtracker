@@ -764,3 +764,80 @@ ADR-023에서 push 이벤트를 도입하며 `GitHubLink.type`이 **PR**과 **CO
 - HIGH로 지적된 `as GitHubLinkType` 캐스트 패턴(Prisma `type String`과 TS 유니언 불일치) — 별도 세션에서 Prisma enum 또는 narrowing 가드로 근본 해결
 - 스크린 리더 접근성 개선(`aria-label`로 "PR #123: 제목" 하나의 컨텍스트로 읽히게)
 - BRANCH 타입을 실제로 사용할 이벤트(예: branch push 별도 표시)가 정해지면 팔레트/힌트 보강
+
+---
+
+## ADR-025: 기술 부채 정리 묶음 — 타입 가드·UUID 파싱·상수시간 비교·접근성
+
+**날짜**: 2026-04-21
+**상태**: 채택
+
+### 맥락
+최근 5 세션 동안 GitHub 연동 스토리(ADR-020~024)를 빠르게 이어가면서 코드 리뷰에서 지적된 기술 부채가 누적됐다:
+
+1. **ADR-024 HIGH**: `GitHubLink.type`에 대한 `as GitHubLinkType` 캐스트가 Prisma `String` 컬럼과 TS 유니언 사이의 런타임 불일치를 침묵시킴
+2. **ADR-022 Known Issue**: Activities API의 `issueId` 파라미터가 `parseInt` 먼저 시도해, UUID 앞자리가 숫자면 엉뚱한 `issueNumber`에 매칭되는 엣지 버그 (E2E 작성 중 실제로 부딪혀 테스트를 `issueNumber` 경로로 우회했던 사례)
+3. **ADR-023 HIGH**: `safeCompare`가 길이 불일치 시 즉시 `false` 반환해, sha256 hex 고정 길이 컨텍스트에선 실질 위협이 낮으나 보안 함수로서의 엄밀성 부족
+4. **ADR-024 LOW**: `GitHubLinkList`의 타입 pill·힌트 span·상태 pill이 스크린 리더에게 독립 텍스트로 읽혀 "PR #123: 제목"이 하나의 컨텍스트로 묶이지 않음
+
+기능이 마무리되는 시점에 한 세션으로 묶어 해소한다.
+
+### 결정
+
+**1. 타입 가드 도입 + 인터페이스 정직화** (`src/types/github-link.ts`)
+- `GitHubLink.type: GitHubLinkType` → `string` (Prisma 스키마 `String`에 맞춰 런타임 진실을 반영)
+- `GitHubLink.status: GitHubLinkStatus | null` → `string | null`
+- 좁힘용 타입 가드 추가: `isGitHubLinkType(v)`, `isGitHubLinkStatus(v)` — 각각 내부 `GITHUB_LINK_TYPE_VALUES`/`_STATUS_VALUES` 배열과 비교
+- 컴포넌트(`GitHubLinkList`)에서 `as` 캐스트 제거하고 가드로 narrowing. 미지의 값은 회색 폴백 pill로 조용히 강등
+
+**2. Activities API UUID-우선 파싱** (`activities/route.ts`)
+- UUID 정규식 `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$` 먼저 검사
+- 이후 숫자 정규식 `^\d+$`로 `issueNumber` 경로
+- 둘 다 아니면 `null`(404)
+- `github-links/route.ts`도 같은 패턴으로 통일(기존에는 `parseInt` 버그는 없었지만 일관성 확보)
+
+**3. `safeCompare` 상수시간 엄격화** (`webhooks/github/route.ts`)
+```ts
+const maxLen = Math.max(aBuf.length, bBuf.length, 1);
+const aPad = Buffer.alloc(maxLen);
+const bPad = Buffer.alloc(maxLen);
+aBuf.copy(aPad); bBuf.copy(bPad);
+const sameBytes = crypto.timingSafeEqual(aPad, bPad);
+return sameBytes && aBuf.length === bBuf.length;
+```
+- 두 버퍼를 최대 길이로 zero-pad 후 `timingSafeEqual`을 **항상 실행**
+- 최종적으로 원래 길이 동등성과 AND 해서 반환 — 길이 분기가 비교 뒤로 이동해 길이 정보 부분 누출 여지 차단
+
+**4. 접근성 통합** (`GitHubLinkList`)
+- anchor(`<a>`)에 `aria-label="{타입} {힌트}: {제목}"` 부여 (예: "PR #123: [DEV-42] 수정")
+- 타입 pill / 힌트 span / 상태 pill에 `aria-hidden="true"` — 시각 사용자에겐 보이지만 스크린 리더는 링크의 통합 레이블만 낭독
+- typeLabel이 빈 문자열일 경우 "링크" 폴백 — 접근명이 콜론으로 시작하지 않도록 방어
+
+### 근거
+- **정직한 타입이 정직한 코드**: 인터페이스가 런타임과 다르면 어디선가 누군가 `as`로 메운다. 인터페이스를 DB 진실에 맞춰 `string`으로 두고, 가드가 값의 안전한 경계를 만듦. 기존 `?? fallback` 패턴과 자연스럽게 맞물림.
+- **Activities UUID 엣지는 실사용 버그**: 운영 호출은 `issueNumber`로 주로 가지만, 이슈 상세 내부 fetch 경로나 사용자가 ID를 URL에 직접 입력하는 케이스에서 재현됨. E2E 작성 때 실제로 우회해야 했던 기록이 있음 → 근본 수정 가치 있음.
+- **두 라우트 통일**: `activities`와 `github-links`가 같은 `issueId` 의미론을 공유하므로 파싱 규칙도 동일해야 예측 가능. 추후 동일 구조의 새 라우트를 만들 때 템플릿.
+- **상수시간 비교 엄격화는 방어적 습관**: 현재 sha256=hex(64) 고정 길이라 실질 위협은 낮지만, 함수가 다른 곳에 재사용되거나 서명 포맷이 바뀔 때를 대비. `Buffer.alloc`은 O(maxLen)이라 비용도 미미.
+- **`aria-label` 통합**: pill·힌트·제목이 각기 읽히면 "PR, 숫자 123, [DEV-42] 수정" 세 단락으로 파편화됨. anchor에 단일 레이블을 주면 "PR #123: [DEV-42] 수정"으로 자연스럽게 읽힘. `aria-hidden`은 시각 배지를 숨기지 않고 보조기술만 우회.
+
+### 결과
+- `src/types/github-link.ts`: 인터페이스 `type`/`status`를 `string`으로 변경, 가드 2개 추가, 내부 값 배열 2개
+- `src/components/common/github-link-list.tsx`: `as` 캐스트 제거, 가드 narrowing, `aria-label` + `aria-hidden`, 빈 타입 "링크" 폴백
+- `src/app/api/projects/[projectId]/issues/[issueId]/activities/route.ts`: UUID-우선 파싱
+- `src/app/api/projects/[projectId]/issues/[issueId]/github-links/route.ts`: 같은 패턴으로 통일
+- `src/app/api/webhooks/github/route.ts`: `safeCompare` zero-pad + 상수시간 + 길이 AND
+- E2E 2건 추가·강화:
+  - `activity-log.spec.ts`: issueNumber/UUID 양 경로 200 응답 + `total` 동등 검증
+  - `github-link-badges.spec.ts`: 기존 링크 locator를 `getByRole("link", { name: "PR #번호: 제목" })` 형태로 교체해 aria-label 통합 검증
+- 총 69/69 E2E 그린(68 → +1). tsc/lint/build 클린.
+
+### 대안
+- **Prisma enum 도입**: SQLite는 Prisma enum을 직접 지원하지 않아 큰 마이그레이션. 가드가 더 가벼움 → 기각.
+- **타입 가드를 zod 스키마로**: 오버킬. 3개 고정 값이라 배열+includes로 충분.
+- **`aria-label` 대신 `visually-hidden` 텍스트**: 같은 결과지만 DOM에 더 많은 노드. `aria-label`이 Lighthouse 기준 간결.
+- **길이 분기 유지 + 주석**: 보안 완결성 포기. 나중에 이 함수를 재사용할 유혹이 있을 때 사고 위험 → 기각.
+
+### 남겨둔 후속
+- `GITHUB_LINK_TYPE_VALUES`/`_STATUS_VALUES`를 `export`해 폼 select 옵션·zod 스키마 파생 공유 (LOW)
+- `handlePush`의 이슈 조회 N+1(`findUnique` 직렬) — 현재 20 commits/delivery 제한으로 문제 없음 (LOW)
+- `PullRequestPayload.pull_request?`로 optional 선언해 런타임 가드와 타입 의도 일치 (정리)

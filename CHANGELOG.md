@@ -3,6 +3,32 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-21] 기술 부채 정리 묶음
+
+### Added
+- `src/types/github-link.ts`: `isGitHubLinkType(v)`, `isGitHubLinkStatus(v)` 타입 가드 추가 (내부 값 배열과 비교)
+- `GitHubLinkList`에 anchor `aria-label="{타입} {힌트}: {제목}"` 부여 + 타입 pill/힌트/상태 pill에 `aria-hidden` — 스크린 리더가 링크를 한 문장으로 읽도록 통합
+- E2E Journey 6에 "activities API accepts both issueNumber and issue.id (UUID)" 테스트 추가 — issueNumber/UUID 양 경로 200 + `total` 동등 검증. 총 69개
+- ADR-025 신규 (기술 부채 정리 묶음 결정 기록)
+
+### Changed
+- `GitHubLink` 인터페이스의 `type`/`status`를 `GitHubLinkType`/`GitHubLinkStatus` 유니언 → `string`으로 완화해 Prisma 스키마(String) 런타임 진실과 일치. 컴포넌트는 타입 가드로 좁혀서 사용
+- `GitHubLinkList`의 `as GitHubLinkType`/`as GitHubLinkStatus` 캐스트 제거 — 가드 narrowing으로 대체, 미지의 값은 회색 폴백 pill로 강등
+- `activities/route.ts`와 `github-links/route.ts`의 `issueId` 파싱을 UUID-우선 정규식 → 숫자 정규식 → null 순서로 통일. `parseInt`가 UUID 앞자리를 숫자로 읽어 엉뚱한 이슈에 매칭되던 엣지 버그 차단
+- `safeCompare()`(webhook 서명 검증)를 zero-pad 후 `timingSafeEqual` **항상 실행** + 길이 동등성 AND 반환으로 엄격화. 길이 분기가 비교 뒤로 이동해 길이 정보 부분 누출 여지 차단
+- E2E `github-link-badges.spec.ts` 링크 locator를 `getByRole("link", { name: "PR #번호: 제목" })` 형태로 교체해 aria-label 통합 검증
+
+### Fixed
+- typeLabel이 빈 문자열일 경우 `aria-label`이 콜론으로 시작하는 엣지(스크린 리더에 어색한 낭독) → "링크" 폴백
+
+### Security
+- `safeCompare` 타이밍 엄격화 — sha256 hex 64자 고정 길이 컨텍스트에선 실질 위협 낮았지만 함수 재사용·서명 포맷 변경을 대비한 방어적 개선
+
+### Documentation
+- `docs/e2e-testing-guide.md` Journey 6 4 → 5건 / 전체 68 → 69개
+
+---
+
 ## [2026-04-21] GitHubLink 타입 배지 UI
 
 ### Added
