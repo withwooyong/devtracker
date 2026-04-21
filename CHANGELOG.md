@@ -3,6 +3,29 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-21] GitHub push 이벤트 지원
+
+### Added
+- `src/app/api/webhooks/github/route.ts`: push 이벤트 핸들러(`handlePush()`) 신설. 커밋 메시지에서 이슈 키 추출 → 프로젝트/이슈 매핑 → `GitHubLink(type="COMMIT", status=null, externalId=commit.id)` upsert
+- 응답 필드에 `commits: number`(페이로드 내 총 커밋 수) 추가. `matched`는 연결된 링크 수
+- scoped 모드에서 매핑된 프로젝트 키의 커밋만 링크되고, 외부 키는 `skippedKeys`(중복 제거된 Set)로 응답 + `console.info` 로그
+- E2E Journey 14 × 5건: 기본 링크 생성, 동일 push 재전송 dedup, 다중 commit 부분 매핑, deleted push skipped, 빈 commits matched=0
+- E2E Journey 14b × 1건: scoped 모드 cross-project 커밋은 `skippedKeys`에 축적 — 총 66개
+- ADR-023 신규 (push 이벤트 지원 결정 기록)
+- `docs/user-guide.md` 10-2 표에 Push(commit) 행 추가, 10-3 주의사항에 push 동작 설명 추가
+
+### Changed
+- 기존 단일 POST 핸들러에서 PR 로직을 `handlePullRequest()`로 추출하고, 공통 프로젝트 조회를 `resolveProjectForKey()` 헬퍼로 분리 — behavior-preserving refactor
+- push 루프의 프로젝트 조회를 `findMany({ key: { in: uniqueKeys } })`로 배치화해 legacy 모드 N+1 제거
+- `deleted: true` 조기 반환 응답에도 `matched: 0, commits: 0` 포함해 응답 shape 통일
+- `PullRequestPayload`/`PushPayload`/`ScopedProjectLite` 타입 추가로 핸들러 간 계약 명시
+- `docs/e2e-testing-guide.md` 60개/13 Journey → 66개/14 Journey(14/14b 하위 묶음)
+
+### Security
+- push 이벤트도 기존 서명 검증(전역/프로젝트별 secret 선택) + scoped 라우팅을 그대로 적용 — 보안 경계 변경 없음
+
+---
+
 ## [2026-04-21] GitHub 사용자 매핑
 
 ### Added

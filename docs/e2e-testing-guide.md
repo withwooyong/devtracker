@@ -46,7 +46,7 @@ tests/e2e/
 playwright.config.ts               # Playwright 설정
 ```
 
-## 현재 테스트 목록 (60개, 13개 Journey — 10b/10c 하위 묶음 포함)
+## 현재 테스트 목록 (66개, 14개 Journey — 10b/10c/14b 하위 묶음 포함)
 
 | Journey | Spec 파일 | 테스트 수 |
 |---------|-----------|-----------|
@@ -64,6 +64,8 @@ playwright.config.ts               # Playwright 설정
 | 11. 알림 Outbox | notification-outbox.spec.ts | 4 |
 | 12. 프로젝트 설정 | project-settings.spec.ts | 5 |
 | 13. GitHub 사용자 매핑 | user-mapping.spec.ts | 6 |
+| 14. GitHub Push Webhook | github-push.spec.ts | 5 |
+| 14b. Push Webhook (scoped cross-project 스킵) | github-push.spec.ts | 1 |
 
 ### 주요 검증 포인트
 

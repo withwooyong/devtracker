@@ -659,3 +659,59 @@ ADR-017 도입 이후 PR 머지로 인한 이슈 상태 변경(STATUS_CHANGED Ac
 - 관리자용 매핑 관리 화면(admin이 다른 사용자의 githubLogin 조회/수정/해제)
 - 매핑 변경 감사 로그
 - GitHub OAuth로 자동 매핑 전환(원할 경우)
+
+---
+
+## ADR-023: GitHub push 이벤트 지원 (커밋 ↔ 이슈 링크)
+
+**날짜**: 2026-04-21
+**상태**: 채택
+
+### 맥락
+ADR-017/020/021/022까지는 **pull_request** 이벤트만 처리했다. 하지만 팀은 초안 PR 이전 단계에서도 커밋 메시지에 이슈 키(`DEV-42`)를 붙여 push하는 관행이 있어, 머지 이전의 작업 이력을 이슈에서 바로 볼 수 있게 하자는 요구가 누적됐다. push 이벤트는 PR 없이도 들어오므로 기존 라우팅·서명·매핑을 그대로 재사용하면서도 **이슈 상태는 건드리지 않는** 링크 전용 경로가 필요했다.
+
+### 결정
+**push 이벤트 전용 분기를 webhook 라우트에 추가**하고, 커밋마다 `GitHubLink(type="COMMIT")`를 `(issueId, url)` 기준 upsert한다. 이슈 상태 변경과 Activity 기록은 PR Merge의 고유 영역으로 남기고, push는 링크만 생성한다.
+
+1. **라우팅 리팩터**: 기존 단일 POST 핸들러에서 PR 로직을 `handlePullRequest()`로 추출하고, 새로 `handlePush()`를 추가. 공통 프로젝트 조회는 `resolveProjectForKey()`(scoped/legacy 통합)로 분리.
+2. **분기 조건**:
+   - `payload.deleted === true` → `skipped: "deleted"`와 `matched: 0, commits: 0` 응답, 즉시 종료 (브랜치 삭제/force push 대응)
+   - `commits.length === 0` → `matched: 0` 응답 (빈 push 조용히 통과)
+3. **매핑 로직**:
+   - 모든 commits의 이슈 키를 한 번 모아 **project는 1회 `findMany({ key: { in: uniqueKeys } })`** 로 조회 → legacy 모드 N+1 제거
+   - scoped 모드는 매핑된 프로젝트 키만 허용, 그 외 키는 `skippedKeys`(Set으로 중복 제거)에 축적
+   - 이슈는 `(projectId, issueNumber)` 유니크로 개별 조회(실존 여부 확인 필요)
+4. **GitHubLink 필드**:
+   - `type: "COMMIT"`, `status: null` (커밋에는 자연스러운 상태가 없음), `externalId: commit.id` (40자 SHA)
+   - `title`: 커밋 메시지 1줄 요약, 200자 제한. 빈 줄일 경우 SHA 앞 7자
+   - 재전송·rebase로 인한 중복도 `(issueId, url)` 유니크로 안전
+5. **응답 shape**: `{ ok, event: "push", matched, commits, mode, secretSource, skippedKeys? }`. `deleted` 조기 반환 경로도 동일 shape를 유지해 클라이언트·테스트가 혼란 없도록 `matched: 0, commits: 0`을 포함.
+
+### 근거
+- **상태 변경은 PR의 영역**: 커밋마다 이슈 상태를 바꾸면 활동 로그가 소음으로 가득 찬다. push는 "링크 기록"만 한다는 역할 분리가 활동 로그 신호 대 잡음 비를 유지.
+- **Activity 생성 안 함**: 커밋 단위 Activity는 수십 개가 한 번에 생기고 매핑 실패 시 reporter 명의로 폴백되는 것도 부정확하다. 이벤트 로그는 GitHubLink 리스트 자체가 대신한다.
+- **배치 project 조회로 N+1 제거**: push는 GitHub 기본 20 commits/delivery까지 올 수 있어 루프마다 `findFirst`는 확장성 문제가 됨. 고유 키 집합을 선수집해 `findMany({ in })` 1회로 전환. 이슈 조회는 `(projectId, issueNumber)` 단위 조회가 최소 쿼리 수(중복 제거 불가능)이므로 유지.
+- **`skippedKeys` Set**: 다른 commit들이 같은 타 프로젝트 키를 반복 참조하면 배열에 중복 값이 누적되던 MEDIUM 이슈를 Set으로 해결. 응답·로그 모두 중복 없음.
+- **`deleted: true` 응답 shape 통일**: 초기 설계는 조기 반환이라 필드 일부만 담았으나, 클라이언트/테스트 파서 관점에선 `matched`/`commits`를 항상 기대하는 게 단순. LOW 이슈로 지적되어 정리.
+- **`resolvePullRequestAuthor` 재사용 보류**: push의 pusher/commit.author는 commit SHA당 다를 수 있고, Activity를 안 만들면 사실상 사용처가 없어 이번엔 연결하지 않음. 나중에 "커밋 작성자 별 활동 수" 같은 지표가 필요할 때 복원.
+
+### 결과
+- `src/app/api/webhooks/github/route.ts`:
+  - PR 로직을 `handlePullRequest()`로 추출
+  - `handlePush()` 추가 (배치 조회 · `skippedKeys` Set · `deleted` 응답 통일)
+  - `resolveProjectForKey(key, scopedProject)` 공통 헬퍼 도입
+  - `PushCommit`/`PushPayload` 타입 추가
+  - 엔트리포인트는 `event === "ping" | "pull_request" | "push"` 분기, 그 외 `skipped`
+- E2E Journey 14 × 5건: 이슈 키 포함 커밋 링크 생성, 동일 push 재전송 중복 미생성(`@@unique([issueId, url])`), 다중 commit 중 일부만 매핑, deleted push 스킵, 빈 commits 스킵.
+- E2E Journey 14b × 1건: scoped 모드에서 매핑된 프로젝트 키의 commit만 링크되고 외부 키는 `skippedKeys`.
+- 문서: `docs/user-guide.md` 10-2에 Push 행 추가, 10-3에 push 동작 주석 추가.
+
+### 대안
+- **Push에서도 이슈 상태 변경**: 커밋 메시지에 `Fixes DEV-42` 같은 키워드가 있을 때 DONE 전환. GitHub 기본 동작과 유사하지만 팀 워크플로 상 PR 승인이 공식 "완료" 시그널이라 일관성이 깨짐 → 기각.
+- **배치 이슈 조회**: `findMany({ OR: [(projectId, issueNumber), ...] })`로 이슈도 1회. 실제 실행된 OR 서브쿼리가 복잡해 옵티마이저가 인덱스를 덜 쓸 우려가 있고, 대부분의 push는 고유 이슈 2~5개 수준이라 이득이 작음 → 현재 상태 유지.
+- **Push에서도 `resolvePullRequestAuthor` 적용해 Activity 생성**: 소음 문제로 기각. 후속에 "지표"용으로 다시 열어볼 수 있음.
+
+### 남겨둔 후속
+- 같은 커밋 SHA가 **여러 브랜치에 나타날 때** URL이 동일(`/commit/<sha>`)이라 중복 링크 문제 없지만, 만약 GitHub이 URL에 브랜치 쿼리를 붙여 변조한다면 SHA 기반 유니크(`@@unique([issueId, externalId])`)로 강화 고려
+- push 이벤트에 대한 rate limiting(대규모 monorepo에서 푸시 폭주 방어)
+- 이슈 상세 UI에서 COMMIT 타입 링크의 시각적 구분(아이콘/배지)
