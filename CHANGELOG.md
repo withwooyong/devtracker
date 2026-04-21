@@ -3,6 +3,29 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-21] GitHub webhook 프로젝트별 secret
+
+### Added
+- `Project.githubWebhookSecret String?` 필드 추가. 설정 시 해당 프로젝트의 webhook은 전역 `GITHUB_WEBHOOK_SECRET` 대신 이 값으로 서명을 재검증 (로컬 SQLite + Turso 반영)
+- `src/app/api/webhooks/github/route.ts`: 라우팅 순서 재설계 — rawBody best-effort 파싱 → `repository.full_name`으로 scoped 프로젝트 조회 → secret 선택(프로젝트 secret 있으면 우선, 없으면 전역) → HMAC 검증 → 이후 ping/pull_request 분기
+- webhook 응답에 `secretSource: "project" | "global"` 필드 추가 (운영·테스트 관측성)
+- 설정 페이지에 **Webhook Secret** 섹션 신설: password 입력 + 설정됨/미설정 뱃지 + 제거/제거 취소 액션. 저장 성공 후 입력값 초기화
+- `src/types/project.ts`에 `githubWebhookSecretSet?: boolean` 필드 추가
+- E2E Journey 10c × 3건: GET 응답에 secret 원문 비노출, 프로젝트 secret 서명 통과(`secretSource=project`), 프로젝트 secret 설정 상태에서 전역 secret 서명은 401 — 총 54개
+- ADR-021 신규 (프로젝트별 webhook secret 결정 기록)
+
+### Changed
+- `GET/PATCH /api/projects/[projectId]`: 응답을 `select`로 필드 고정하고 `githubWebhookSecret` 원문은 제거, `githubWebhookSecretSet: boolean` 플래그로 대체 (서버 → 클라이언트로 평문 유출 금지)
+- `updateSchema` 확장: `githubWebhookSecret`(16~256자 또는 빈 문자열→`null`). 빈 문자열은 서버에서 `null`로 정규화하여 전역 secret 재사용
+- `docs/user-guide.md`의 "프로젝트 설정 편집" 섹션에 Webhook Secret 항목 추가
+- `docs/e2e-testing-guide.md` 51개/12 Journey → 54개/12 Journey(10c 하위 묶음) 반영
+
+### Security
+- webhook secret은 프로젝트별 저장 후 API로 다시 흐르지 않도록 설계 (자격증명 평문 유출 방지)
+- 서명 검증 전 수행하는 부작용은 `JSON.parse`와 `repo` 완전일치 `findFirst` 한 번뿐이며, 실패 시 즉시 401 — 쿼리 증폭/DoS 벡터 없음
+
+---
+
 ## [2026-04-21] GitHub webhook 하이브리드 라우팅
 
 ### Added
