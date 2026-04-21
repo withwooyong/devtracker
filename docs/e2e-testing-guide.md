@@ -46,7 +46,7 @@ tests/e2e/
 playwright.config.ts               # Playwright 설정
 ```
 
-## 현재 테스트 목록 (43개, 11개 Journey)
+## 현재 테스트 목록 (48개, 12개 Journey)
 
 | Journey | Spec 파일 | 테스트 수 |
 |---------|-----------|-----------|
@@ -60,6 +60,7 @@ playwright.config.ts               # Playwright 설정
 | 9. 이슈 첨부파일 (Vercel Blob Private) | attachments.spec.ts | 7 |
 | 10. GitHub Webhook | github-webhook.spec.ts | 6 |
 | 11. 알림 Outbox | notification-outbox.spec.ts | 4 |
+| 12. 프로젝트 설정 | project-settings.spec.ts | 5 |
 
 ### 주요 검증 포인트
 

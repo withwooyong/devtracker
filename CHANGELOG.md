@@ -3,6 +3,28 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-21] 프로젝트 설정 페이지 1차
+
+### Added
+- `Project.githubRepo String?` (`"owner/repo"` 형식) 필드 추가. Turso에도 `ALTER TABLE` 반영 (`7a82bb4`)
+- `/projects/[projectKey]/settings` 신규 클라이언트 페이지: 설명·GitHub 레포 편집 폼. 권한 없는 사용자에게는 읽기 전용 안내 표시 (`7a82bb4`)
+- 4개 프로젝트 탭 페이지(이슈 목록·칸반·스프린트·배포 이력)에 **설정** 링크 추가 (`7a82bb4`)
+- E2E Journey 12 × 5건: 탭 노출, 폼 로드, 정상 저장, 형식 오류, 미인증 401 (`7a82bb4`) — 총 48개
+- ADR-019 신규 (프로젝트 설정 1차 스코프 결정 기록)
+
+### Changed
+- `PATCH /api/projects/[projectId]` 권한: `role === "ADMIN"` → `role === "ADMIN" || createdById === user.userId` (프로젝트 생성자도 본인 프로젝트 메타 편집 가능) (`7a82bb4`)
+- `PATCH` 응답 코드 분리: 401(미인증), 403(권한 부족), 404(없음). zod 오류 시 `details` 동반한 400 응답
+- `updateSchema` 확장: `description`(max 2000, nullable), `githubRepo`(빈 문자열 또는 `^(?!.*\.\.)[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$`). 빈 문자열은 서버에서 `null`로 정규화
+- `docs/user-guide.md`에 "프로젝트 설정 편집" 섹션 추가, 프로젝트 탭 목록 갱신 (설정 포함)
+- `docs/e2e-testing-guide.md` 43개 → 48개, Journey 11개 → 12개 반영
+
+### Fixed
+- Settings 페이지 초기 렌더에서 `useEffect` 안에 `setState`를 호출하던 안티패턴(react-hooks/set-state-in-effect 린트 에러) 제거 — 폼을 별도 컴포넌트로 분리하고 `key={project.id}`로 mount 리셋
+- 설정 폼의 label과 input을 `htmlFor`/`id`로 연결 (접근성 + Playwright `getByLabel` 매칭)
+
+---
+
 ## [2026-04-21] 알림 Outbox Transactional 승격
 
 ### Added
