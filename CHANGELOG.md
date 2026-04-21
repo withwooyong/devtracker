@@ -3,6 +3,26 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-21] GitHubLink 타입 배지 UI
+
+### Added
+- `src/types/github-link.ts`: `GITHUB_LINK_TYPE_LABELS`(PR/커밋/브랜치), `GITHUB_LINK_TYPE_COLORS`(blue/slate/amber 저채도 pill) 맵, `formatGitHubLinkExternalHint(type, externalId)` 헬퍼 추가
+- 이슈 상세 `GitHubLinkList`에 타입 컬러 pill + 외부 ID 힌트(PR `#번호`, COMMIT SHA 7자) 렌더링
+- 루트 section·타입 pill·힌트 span에 `data-testid` 부여 — E2E 견고성 확보
+- E2E Journey 15 × 2건: PR 배지+`#번호` 힌트, COMMIT 배지("커밋")+SHA 7자 힌트 렌더링 검증 — 총 68개
+- ADR-024 신규 (타입 배지 UI 결정 기록)
+- `docs/user-guide.md` 10-2에 타입 배지 색상·힌트 가이드 추가
+- `.gitignore`에 `.claude/settings.local.json` 추가 — Claude Code 개인 설정 격리
+
+### Changed
+- `docs/e2e-testing-guide.md` 66개/14 Journey → 68개/15 Journey
+
+### Fixed
+- E2E locator 견고성: `page.locator("h3").locator("..")` XPath 부모 참조 → `page.getByTestId("github-link-section")` 직행
+- PR 번호 충돌 가능성: `Date.now() % 1_000_000`(16.7분 주기 중복) → `Math.floor(Math.random() * 1e9)` (unique 제약 저촉 회피)
+
+---
+
 ## [2026-04-21] GitHub push 이벤트 지원
 
 ### Added
