@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/main-layout";
+import { ProjectTabs } from "@/components/layout/project-tabs";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Project } from "@/types/project";
 
@@ -34,43 +35,12 @@ export default function ProjectSettingsPage({
   return (
     <MainLayout>
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+        <div className="flex items-center justify-between mb-6 gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold text-gray-900 truncate">
               {project?.name ?? projectKey} 설정
             </h1>
-            <div className="flex gap-3 mt-2 text-sm">
-              <Link
-                href={`/projects/${projectKey}`}
-                className="text-gray-500 hover:text-gray-700 pb-1"
-              >
-                이슈 목록
-              </Link>
-              <Link
-                href={`/projects/${projectKey}/board`}
-                className="text-gray-500 hover:text-gray-700 pb-1"
-              >
-                칸반 보드
-              </Link>
-              <Link
-                href={`/projects/${projectKey}/sprints`}
-                className="text-gray-500 hover:text-gray-700 pb-1"
-              >
-                스프린트
-              </Link>
-              <Link
-                href={`/projects/${projectKey}/deployments`}
-                className="text-gray-500 hover:text-gray-700 pb-1"
-              >
-                배포 이력
-              </Link>
-              <Link
-                href={`/projects/${projectKey}/settings`}
-                className="text-blue-600 font-medium border-b-2 border-blue-600 pb-1"
-              >
-                설정
-              </Link>
-            </div>
+            <ProjectTabs projectKey={projectKey} />
           </div>
         </div>
 
