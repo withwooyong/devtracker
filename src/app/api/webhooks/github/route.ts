@@ -2,10 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 
-// 타이밍 공격 방지를 위한 상수 시간 비교
-function safeCompare(a: string, b: string) {
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+// 타이밍 공격 방지를 위한 상수 시간 비교.
+// 길이가 다를 때 즉시 분기하면 "길이 부분만 맞는 접두어를 찾아가며 공격" 여지가 생긴다.
+// 두 버퍼를 같은 최대 길이로 zero-pad 후 timingSafeEqual을 항상 실행하고,
+// 최종적으로 원래 길이 동일성과 AND 해서 반환한다.
+function safeCompare(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  const maxLen = Math.max(aBuf.length, bBuf.length, 1);
+  const aPad = Buffer.alloc(maxLen);
+  const bPad = Buffer.alloc(maxLen);
+  aBuf.copy(aPad);
+  bBuf.copy(bPad);
+  const sameBytes = crypto.timingSafeEqual(aPad, bPad);
+  return sameBytes && aBuf.length === bBuf.length;
 }
 
 function verifyWithSecret(

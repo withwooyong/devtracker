@@ -83,12 +83,11 @@ test.describe("Journey 15: GitHubLink type 배지 렌더링", () => {
     await expect(section.getByText("PR", { exact: true }).first()).toBeVisible();
     // #번호 힌트
     await expect(section.getByText(`#${prNumber}`, { exact: true })).toBeVisible();
-    // 제목 링크
-    await expect(
-      section.getByRole("link", {
-        name: `[${issueKey}] 배지 렌더링 확인`,
-      })
-    ).toBeVisible();
+    // 제목 링크 + aria-label 통합: "PR #번호: 제목"
+    const prLink = section.getByRole("link", {
+      name: `PR #${prNumber}: [${issueKey}] 배지 렌더링 확인`,
+    });
+    await expect(prLink).toBeVisible();
   });
 
   test("COMMIT 링크는 '커밋' 배지와 SHA 7자 힌트로 표시된다", async ({
@@ -125,9 +124,10 @@ test.describe("Journey 15: GitHubLink type 배지 렌더링", () => {
     ).toBeVisible();
     // SHA 앞 7자 힌트
     await expect(section.getByText(sha.slice(0, 7), { exact: true })).toBeVisible();
-    // 제목 링크
-    await expect(
-      section.getByRole("link", { name: `[${issueKey}] 작은 리팩터` })
-    ).toBeVisible();
+    // 제목 링크 + aria-label 통합: "커밋 <sha7>: 제목"
+    const commitLink = section.getByRole("link", {
+      name: `커밋 ${sha.slice(0, 7)}: [${issueKey}] 작은 리팩터`,
+    });
+    await expect(commitLink).toBeVisible();
   });
 });

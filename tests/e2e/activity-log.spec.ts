@@ -150,4 +150,40 @@ test.describe("Journey 6: Activity Log on Issue Detail", () => {
 
     expect(hasItems || hasEmptyState).toBeTruthy();
   });
+
+  test("activities API accepts both issueNumber and issue.id (UUID)", async ({
+    page,
+  }) => {
+    // 새 이슈 생성 → UUID와 issueNumber 두 경로 모두로 activities 조회
+    const createRes = await page.request.post(
+      `/api/projects/${PROJECT_KEY}/issues`,
+      {
+        data: {
+          title: `E2E-activities-uuid-${Date.now()}`,
+          priority: "LOW",
+          status: "TODO",
+        },
+      }
+    );
+    expect(createRes.status()).toBe(201);
+    const { issue } = await createRes.json();
+
+    // issueNumber 경로
+    const byNumber = await page.request.get(
+      `/api/projects/${PROJECT_KEY}/issues/${issue.issueNumber}/activities`
+    );
+    expect(byNumber.status()).toBe(200);
+    const byNumberBody = await byNumber.json();
+    expect(Array.isArray(byNumberBody.activities)).toBeTruthy();
+
+    // UUID 경로 — 이전에는 parseInt가 UUID 앞자리를 숫자로 읽어 엉뚱한 이슈에
+    // 매칭되거나 404를 반환하던 엣지. 이제 UUID 패턴이 우선 검사돼야 한다.
+    const byUuid = await page.request.get(
+      `/api/projects/${PROJECT_KEY}/issues/${issue.id}/activities`
+    );
+    expect(byUuid.status()).toBe(200);
+    const byUuidBody = await byUuid.json();
+    expect(Array.isArray(byUuidBody.activities)).toBeTruthy();
+    expect(byUuidBody.total).toBe(byNumberBody.total);
+  });
 });

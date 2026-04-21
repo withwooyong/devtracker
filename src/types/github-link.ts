@@ -1,16 +1,39 @@
 export type GitHubLinkType = "PR" | "COMMIT" | "BRANCH";
 export type GitHubLinkStatus = "open" | "closed" | "merged";
 
+// type/status는 Prisma 스키마상 String 이라 DB에 예상 외 값이 들어올 수 있다.
+// 인터페이스는 런타임 실제와 맞춰 string으로 두고, 좁힘은 아래 타입 가드로 한다.
 export interface GitHubLink {
   id: string;
   issueId: string;
-  type: GitHubLinkType;
+  type: string;
   url: string;
   title: string;
-  status?: GitHubLinkStatus | null;
+  status?: string | null;
   externalId?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+const GITHUB_LINK_TYPE_VALUES: readonly GitHubLinkType[] = [
+  "PR",
+  "COMMIT",
+  "BRANCH",
+];
+const GITHUB_LINK_STATUS_VALUES: readonly GitHubLinkStatus[] = [
+  "open",
+  "closed",
+  "merged",
+];
+
+export function isGitHubLinkType(v: unknown): v is GitHubLinkType {
+  return typeof v === "string" &&
+    (GITHUB_LINK_TYPE_VALUES as readonly string[]).includes(v);
+}
+
+export function isGitHubLinkStatus(v: unknown): v is GitHubLinkStatus {
+  return typeof v === "string" &&
+    (GITHUB_LINK_STATUS_VALUES as readonly string[]).includes(v);
 }
 
 export const GITHUB_LINK_STATUS_COLORS: Record<GitHubLinkStatus, string> = {

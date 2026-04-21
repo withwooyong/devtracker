@@ -24,12 +24,29 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "프로젝트 없음" }, { status: 404 });
   }
 
-  const issueNumber = parseInt(issueId);
-  const target = isNaN(issueNumber)
-    ? await prisma.issue.findFirst({ where: { id: issueId, projectId: project.id } })
-    : await prisma.issue.findUnique({
-        where: { projectId_issueNumber: { projectId: project.id, issueNumber } },
-      });
+  // UUID 먼저 검사. parseInt가 "601711c0-..." 같은 UUID를 601711로 인식해 엉뚱한
+  // 이슈번호에 매칭되는 엣지 버그 방지.
+  const UUID_PATTERN =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const NUMERIC_PATTERN = /^\d+$/;
+
+  let target;
+  if (UUID_PATTERN.test(issueId)) {
+    target = await prisma.issue.findFirst({
+      where: { id: issueId, projectId: project.id },
+    });
+  } else if (NUMERIC_PATTERN.test(issueId)) {
+    target = await prisma.issue.findUnique({
+      where: {
+        projectId_issueNumber: {
+          projectId: project.id,
+          issueNumber: parseInt(issueId, 10),
+        },
+      },
+    });
+  } else {
+    target = null;
+  }
 
   if (!target) {
     return NextResponse.json({ error: "이슈를 찾을 수 없습니다." }, { status: 404 });
