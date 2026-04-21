@@ -34,6 +34,7 @@ model Project {
   key         String   @unique
   description String?
   githubRepo  String?  // "owner/repo" — webhook 연동 대상, 미설정 시 해당 프로젝트는 webhook 비활성
+  githubWebhookSecret String? // 프로젝트별 webhook HMAC secret. 설정 시 scoped 모드에서 전역 secret 대신 사용.
   createdById String
   createdAt   DateTime @default(now())
 

@@ -16,11 +16,17 @@ export async function GET(
 
   const project = await prisma.project.findFirst({
     where: { OR: [{ id: projectId }, { key: projectId }] },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      key: true,
+      description: true,
+      githubRepo: true,
+      githubWebhookSecret: true,
+      createdById: true,
+      createdAt: true,
+      createdBy: { select: { id: true, name: true, email: true } },
       _count: { select: { issues: true, deployments: true } },
-      createdBy: {
-        select: { id: true, name: true, email: true },
-      },
     },
   });
 
@@ -31,7 +37,14 @@ export async function GET(
     );
   }
 
-  return NextResponse.json({ project });
+  // 비밀값은 절대 반환하지 않고, 설정 여부만 노출한다.
+  const { githubWebhookSecret, ...safe } = project;
+  return NextResponse.json({
+    project: {
+      ...safe,
+      githubWebhookSecretSet: Boolean(githubWebhookSecret),
+    },
+  });
 }
 
 // 각 세그먼트 단위로 검증하고 `..`를 명시적으로 금지
@@ -47,6 +60,16 @@ const updateSchema = z.object({
       z.string().regex(githubRepoPattern, {
         message: "owner/repo 형식이어야 합니다.",
       }),
+    ])
+    .nullable()
+    .optional(),
+  githubWebhookSecret: z
+    .union([
+      z.literal(""),
+      z
+        .string()
+        .min(16, { message: "webhook secret은 16자 이상이어야 합니다." })
+        .max(256, { message: "webhook secret은 256자 이하여야 합니다." }),
     ])
     .nullable()
     .optional(),
@@ -87,10 +110,34 @@ export async function PATCH(
         ...("githubRepo" in data
           ? { githubRepo: data.githubRepo ? data.githubRepo : null }
           : {}),
+        ...("githubWebhookSecret" in data
+          ? {
+              githubWebhookSecret: data.githubWebhookSecret
+                ? data.githubWebhookSecret
+                : null,
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        key: true,
+        description: true,
+        githubRepo: true,
+        githubWebhookSecret: true,
+        createdById: true,
+        createdAt: true,
       },
     });
 
-    return NextResponse.json({ project });
+    // 응답에도 secret 원문은 노출하지 않는다.
+    const { githubWebhookSecret, ...safe } = project;
+    return NextResponse.json({
+      project: {
+        ...safe,
+        githubWebhookSecretSet: Boolean(githubWebhookSecret),
+      },
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

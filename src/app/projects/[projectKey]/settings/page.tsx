@@ -103,6 +103,11 @@ function SettingsForm({
   const queryClient = useQueryClient();
   const [description, setDescription] = useState(project.description ?? "");
   const [githubRepo, setGithubRepo] = useState(project.githubRepo ?? "");
+  const [webhookSecret, setWebhookSecret] = useState("");
+  // null = 변경 없음, "" = 제거, string = 새 값 설정
+  const [webhookSecretAction, setWebhookSecretAction] = useState<
+    null | "set" | "clear"
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -142,9 +147,20 @@ function SettingsForm({
         e.preventDefault();
         setError(null);
         setSuccessMsg(null);
-        updateMutation.mutate({
+        const body: Record<string, unknown> = {
           description: description.trim(),
           githubRepo: githubRepo.trim(),
+        };
+        if (webhookSecretAction === "set") {
+          body.githubWebhookSecret = webhookSecret;
+        } else if (webhookSecretAction === "clear") {
+          body.githubWebhookSecret = "";
+        }
+        updateMutation.mutate(body, {
+          onSuccess: () => {
+            setWebhookSecret("");
+            setWebhookSecretAction(null);
+          },
         });
       }}
       className="bg-white p-6 rounded-lg border border-gray-200 space-y-5"
@@ -200,6 +216,65 @@ function SettingsForm({
         <p className="text-xs text-gray-400 mt-1">
           &quot;owner/repo&quot; 형식으로 입력합니다. 비워두면 해당 프로젝트는
           webhook 연동 대상에서 제외됩니다.
+        </p>
+      </div>
+
+      <div>
+        <label
+          htmlFor="project-webhook-secret"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Webhook Secret
+        </label>
+        <div className="flex items-center gap-2 mb-2 text-xs">
+          <span
+            className={
+              project.githubWebhookSecretSet
+                ? "inline-flex items-center px-2 py-0.5 rounded bg-green-50 text-green-700 border border-green-200"
+                : "inline-flex items-center px-2 py-0.5 rounded bg-gray-50 text-gray-500 border border-gray-200"
+            }
+          >
+            {project.githubWebhookSecretSet ? "설정됨" : "미설정"}
+          </span>
+          {project.githubWebhookSecretSet && webhookSecretAction !== "set" && (
+            <button
+              type="button"
+              onClick={() => setWebhookSecretAction("clear")}
+              className="text-red-600 hover:text-red-800 underline"
+            >
+              제거
+            </button>
+          )}
+          {webhookSecretAction === "clear" && (
+            <button
+              type="button"
+              onClick={() => setWebhookSecretAction(null)}
+              className="text-gray-600 hover:text-gray-800 underline"
+            >
+              제거 취소
+            </button>
+          )}
+        </div>
+        <input
+          id="project-webhook-secret"
+          type="password"
+          value={webhookSecret}
+          onChange={(e) => {
+            setWebhookSecret(e.target.value);
+            setWebhookSecretAction(e.target.value.length > 0 ? "set" : null);
+          }}
+          autoComplete="new-password"
+          disabled={webhookSecretAction === "clear"}
+          placeholder={
+            project.githubWebhookSecretSet
+              ? "재설정하려면 새 secret 입력 (16자 이상)"
+              : "16자 이상의 새 secret 입력"
+          }
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors disabled:bg-gray-50 disabled:cursor-not-allowed"
+        />
+        <p className="text-xs text-gray-400 mt-1">
+          프로젝트별 secret이 설정되면 이 프로젝트의 webhook은 전역 secret 대신
+          이 값으로 서명을 재검증합니다. 값은 저장 후 다시 표시되지 않습니다.
         </p>
       </div>
 

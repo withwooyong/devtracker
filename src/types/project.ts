@@ -4,6 +4,7 @@ export interface Project {
   key: string;
   description?: string | null;
   githubRepo?: string | null;
+  githubWebhookSecretSet?: boolean;
   createdById: string;
   createdAt: string;
   _count?: {
