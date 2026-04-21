@@ -3,6 +3,7 @@ export interface Project {
   name: string;
   key: string;
   description?: string | null;
+  githubRepo?: string | null;
   createdById: string;
   createdAt: string;
   _count?: {

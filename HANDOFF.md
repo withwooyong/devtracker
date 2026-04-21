@@ -1,25 +1,29 @@
 # Session Handoff
 
-> Last updated: 2026-04-21 (KST, 5차 세션 + /handoff)
+> Last updated: 2026-04-21 (KST, 6차 세션 — 프로젝트 설정 페이지 1차)
 > Branch: `main`
-> Latest commit: `a38aaa9` — 알림 Outbox 아토믹성 강화: Transactional Outbox 승격
+> Latest commit: (pending) — 프로젝트 설정 페이지 + `Project.githubRepo` + 권한 가드 확장
 > Production: https://devtracker-dusky.vercel.app
 
 ## Current Status
 
-Phase 1/2/3 + 분리 이슈 3건 + **알림 Outbox Transactional 승격**까지 완료. 본 요청 write와 outbox insert가 단일 `prisma.$transaction`으로 묶여 유실/유령 알림 가능성 제거. E2E 43/43 유지, 타입/린트/빌드 클린. origin/main 동기화 완료.
+Phase 1/2/3 + 분리 이슈 3건 + Outbox Transactional 승격에 이어 **프로젝트 설정 페이지 1차 스코프**(description·githubRepo 편집, ADMIN 또는 createdBy 권한)를 신규 탭으로 추가. E2E **48/48**, 타입/린트/빌드 클린. Webhook 라우팅·사용자 매핑은 후속 ADR로 분리.
 
-## Completed This Session (2026-04-21)
+## Completed This Session (2026-04-21, 6차)
 
 | # | Task | Commit | Files |
 |---|------|--------|-------|
-| 1 | `notification.ts` Transactional API 설계 | `a38aaa9` | `src/lib/notification.ts` |
-| 2 | 이슈 PATCH `$transaction` 적용 + drain guard | `a38aaa9` | `src/app/api/projects/[projectId]/issues/[issueId]/route.ts` |
-| 3 | 댓글 POST `$transaction` 적용 + drain guard | `a38aaa9` | `.../issues/[issueId]/comments/route.ts` |
-| 4 | 스프린트 PATCH `$transaction` 적용 + read를 tx 밖으로 | `a38aaa9` | `.../sprints/[sprintId]/route.ts` |
-| 5 | ADR-018 보강 + HANDOFF Known Issues 정리 | `a38aaa9` | `docs/ADR.md`, `HANDOFF.md` |
-| 6 | 코드 리뷰 반영: drain guard, write-only tx, `satisfies NotificationType` | `a38aaa9` | (위 파일들) |
-| 7 | E2E 43/43 통과 확인, origin/main 푸시 | `a38aaa9` | — |
+| 1 | `Project.githubRepo String?` 스키마 필드 추가 (+Turso ALTER) | (pending) | `prisma/schema.prisma`, `src/types/project.ts` |
+| 2 | PATCH 권한 `ADMIN OR createdBy` 확장 + `description`/`githubRepo` zod | (pending) | `src/app/api/projects/[projectId]/route.ts` |
+| 3 | `/projects/[projectKey]/settings` 페이지 신설 (폼 컴포넌트 분리) | (pending) | `src/app/projects/[projectKey]/settings/page.tsx` |
+| 4 | 4개 탭 페이지에 "설정" 링크 추가 | (pending) | page/board/sprints/deployments page.tsx |
+| 5 | E2E Journey 12 × 5건 (탭 노출, 폼 로드, 정상 저장, 형식 오류, 미인증) | (pending) | `tests/e2e/project-settings.spec.ts` |
+| 6 | 코드 리뷰 반영: lint 블로킹(useEffect setState) 해소, regex `..` 명시 차단, label htmlFor 연결 | (pending) | 위 파일들 |
+| 7 | ADR-019 추가 | (pending) | `docs/ADR.md` |
+
+### 이전 세션(5차) — a38aaa9 기준
+
+- 알림 Outbox Transactional 승격: `enqueueNotificationsTx(tx, inputs)` 신설, 3개 트리거 경로를 단일 `$transaction`으로 묶음
 
 ## Recent Commits
 
@@ -59,13 +63,14 @@ b263347  Phase 3-1 파일 첨부: Vercel Blob + 이슈 연동
 - [ ] Rate limiting (알림/첨부/webhook 엔드포인트) — Upstash Redis 또는 Vercel Edge Config
 - [ ] 드롭다운 Link 클릭 mutation.onSuccess 후 router.push (경주 조건)
 - [ ] GitHub push 이벤트 지원 (커밋 ↔ 이슈 자동 연결, Phase 4+)
-- [ ] 프로젝트 설정 페이지 (`/projects/[key]/settings`) — 프로젝트별 GitHub 레포 연결
+- [ ] webhook 라우팅을 `Project.githubRepo` 기반으로 전환 (현재 전역 secret + PR 제목 이슈 키)
 - [ ] GitHub 사용자 ↔ DevTracker 사용자 매핑
 - [ ] Orphan blob cleanup 배치 (head list 대조)
 - [x] ~~Vercel Blob Private 마이그레이션~~ — 완료 (`77b60a7`)
 - [x] ~~백로그 API sprintId=none 필터~~ — 완료 (`287a804`)
 - [x] ~~알림 Outbox 패턴~~ — 완료 (`5d2bf99`)
 - [x] ~~알림 Outbox 아토믹성 강화 (`$transaction` 도입)~~ — 완료 (`a38aaa9`)
+- [x] ~~프로젝트 설정 페이지 1차 (description·githubRepo 편집)~~ — 완료 (이번 세션)
 
 ## Context for Next Session
 

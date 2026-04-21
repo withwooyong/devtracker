@@ -33,6 +33,7 @@ model Project {
   name        String
   key         String   @unique
   description String?
+  githubRepo  String?  // "owner/repo" — webhook 연동 대상, 미설정 시 해당 프로젝트는 webhook 비활성
   createdById String
   createdAt   DateTime @default(now())
 

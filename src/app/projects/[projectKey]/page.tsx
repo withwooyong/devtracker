@@ -158,6 +158,12 @@ export default function ProjectIssuePage({
               >
                 배포 이력
               </Link>
+              <Link
+                href={`/projects/${projectKey}/settings`}
+                className="text-gray-500 hover:text-gray-700 pb-1"
+              >
+                설정
+              </Link>
             </div>
           </div>
           <Link

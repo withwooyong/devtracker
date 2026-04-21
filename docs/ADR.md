@@ -478,3 +478,43 @@ ADR-014에서 알림은 API 핸들러 내부에서 `prisma.notification.createMa
 - `triggerNotificationDrain()`은 트랜잭션 커밋 성공 후에만 호출하여 인라인 드레인이 커밋된 행을 보도록 보장. 트랜잭션이 롤백되면 outbox 행도 함께 사라짐.
 - 스프린트 PATCH의 경우 대상 assignee 조회는 read이므로 트랜잭션 밖에서 수행해 write-only tx를 유지 (libSQL 단일 라이터 lock 경쟁 최소화).
 - 드레인 호출은 실제 알림 insert가 있었던 경우로 한정(`hasNotifications`, `recipients.length > 0`). 불필요한 outbox 스캔 제거.
+
+---
+
+## ADR-019: 프로젝트 설정 페이지 + 권한 가드 (1차 스코프)
+
+**날짜**: 2026-04-21
+**상태**: 채택
+
+### 맥락
+ADR-017에서 GitHub webhook은 전역 `GITHUB_WEBHOOK_SECRET` 하나와 PR 제목의 이슈 키(`DEV-123`)로 프로젝트를 매핑했다. 여러 레포가 같은 DevTracker 인스턴스를 쓰게 되면 프로젝트별 레포 연결 정보가 필요하다. 또한 프로젝트 생성자(createdBy)가 본인 프로젝트의 메타(설명) 정도는 직접 편집할 수 있어야 한다.
+
+### 결정
+1차 스코프는 "프로젝트 메타 편집"만. 다음으로 범위를 자른다.
+
+1. `Project.githubRepo String?` (`"owner/repo"` 형식) 필드 추가. 1차에선 값만 저장, webhook 라우팅 교체는 후속.
+2. `PATCH /api/projects/[projectId]`: 권한을 `role === "ADMIN"` → `role === "ADMIN" || createdById === user.userId`로 확장. 401(미인증)/403(권한 부족)/404(없음) 분리.
+3. `updateSchema`에 `description`(max 2000, nullable), `githubRepo`(빈 문자열 또는 `^(?!.*\.\.)[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$`) 추가. 빈 문자열은 서버에서 `null`로 정규화.
+4. `/projects/[projectKey]/settings` 클라이언트 페이지: 기존 탭 네비게이션에 "설정" 추가(항상 노출). 권한 없는 사용자에게는 읽기 전용 안내 문구만 렌더.
+5. 폼 컴포넌트를 분리하고 `key={project.id}`로 mount 제어 → `useEffect` 안의 `setState` 패턴(react-hooks/set-state-in-effect) 회피.
+
+### 근거
+- **소규모 스코프**: 멀티 레포 webhook 라우팅·사용자 매핑·권한 레벨 정교화는 별 ADR로 분리. 1차에서 UI와 데이터 모델만 선행.
+- **createdBy 편집 허용**: ADMIN-only로 두면 프로젝트를 만든 담당자가 본인 프로젝트 설명도 못 바꾸는 역설이 생긴다.
+- **zod regex의 `..` 명시적 차단**: DB 저장 문자열이라 경로 traversal 위험은 없지만 의도 명확화.
+- **탭 링크를 항상 노출**: 권한 확인을 위해 각 탭 페이지에서 project·user를 전부 조회하는 비용을 피함. 서버 가드가 진실의 소스, UI는 힌트.
+- **프로젝트 존재 여부 탐색 가능성**: 404/403 분리로 인증된 아웃사이더가 임의 `projectId`로 존재 여부를 탐색 가능하지만, 본 프로젝트는 "모든 인증 사용자가 모든 프로젝트 접근"을 의도적으로 허용(Known Issues)해 이미 GET으로도 노출 중. 새 정보 노출 없음.
+
+### 결과
+- `prisma/schema.prisma` `Project.githubRepo String?` 추가, Turso `ALTER TABLE Project ADD COLUMN githubRepo TEXT` 적용
+- `src/types/project.ts`에 `githubRepo?: string | null`
+- `src/app/api/projects/[projectId]/route.ts` PATCH 권한/스키마 확장
+- `src/app/projects/[projectKey]/settings/page.tsx` 신규 (폼 컴포넌트 분리)
+- 4개 탭 페이지에 "설정" 링크 추가
+- `tests/e2e/project-settings.spec.ts` Journey 12 × 5건 (탭 노출, 폼 로드, 정상 저장, 형식 오류, 미인증 401)
+
+### 남겨둔 후속
+- webhook 라우팅을 `Project.githubRepo` 기반으로 전환 (현재는 전역 secret + PR 제목 이슈 키로 매핑)
+- GitHub 사용자 ↔ DevTracker 사용자 매핑
+- ADMIN-only 항목(프로젝트 삭제, 키 변경) 별도 섹션
+- 프로젝트 멤버십 개념 도입 시 탭 노출도 권한 기반으로 전환
