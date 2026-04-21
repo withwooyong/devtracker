@@ -229,5 +229,148 @@ test.describe("Journey 10: GitHub Webhook", () => {
     expect(res.status()).toBe(200);
     const json = await res.json();
     expect(json.matched).toBe(0);
+    expect(json.mode).toBe("legacy");
+  });
+});
+
+test.describe("Journey 10b: GitHub Webhook — Hybrid Routing (scoped)", () => {
+  const SCOPED_REPO = "e2e-hybrid-owner/e2e-hybrid-repo";
+
+  async function setGithubRepo(
+    playwright: import("@playwright/test").PlaywrightWorkerArgs["playwright"],
+    baseURL: string,
+    value: string
+  ) {
+    // 독립 APIRequestContext로 격리된 로그인+patch. beforeAll/afterAll의 쿠키 공유 불확실성 회피.
+    const ctx = await playwright.request.newContext({ baseURL });
+    try {
+      const loginRes = await ctx.post("/api/auth/login", {
+        data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+      });
+      expect(loginRes.status()).toBe(200);
+      const res = await ctx.patch(`/api/projects/${PROJECT_KEY}`, {
+        data: { githubRepo: value },
+      });
+      expect(res.status()).toBe(200);
+    } finally {
+      await ctx.dispose();
+    }
+  }
+
+  test.beforeAll(async ({ playwright, baseURL }) => {
+    await setGithubRepo(playwright, baseURL ?? "http://localhost:3000", SCOPED_REPO);
+  });
+
+  test.afterAll(async ({ playwright, baseURL }) => {
+    // 복원 실패 시 Journey 10 legacy 테스트가 깨지므로 반드시 검증
+    await setGithubRepo(playwright, baseURL ?? "http://localhost:3000", "");
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await loginViaApi(page);
+  });
+
+  test("scoped mode: matching repo routes to the mapped project", async ({
+    page,
+  }) => {
+    const issue = await ensureIssue(page);
+    const issueKey = `${PROJECT_KEY}-${issue.issueNumber}`;
+    const prNumber = Date.now();
+
+    const payload = {
+      action: "opened",
+      pull_request: {
+        number: prNumber,
+        title: `[${issueKey}] scoped routing test`,
+        html_url: `https://github.com/${SCOPED_REPO}/pull/${prNumber}`,
+        merged: false,
+        state: "open",
+        head: { ref: `feature/${issueKey.toLowerCase()}` },
+      },
+      repository: { full_name: SCOPED_REPO },
+    };
+    const body = JSON.stringify(payload);
+
+    const res = await page.request.post("/api/webhooks/github", {
+      headers: {
+        "x-github-event": "pull_request",
+        "x-hub-signature-256": signBody(body),
+        "content-type": "application/json",
+      },
+      data: body,
+    });
+    expect(res.status()).toBe(200);
+    const json = await res.json();
+    expect(json.mode).toBe("scoped");
+    expect(json.matched).toBe(1);
+  });
+
+  test("scoped mode: PR with non-mapped project key is ignored", async ({
+    page,
+  }) => {
+    const prNumber = Date.now() + 1;
+    // scoped project는 DEV인데 PR 제목에는 OPS 키만 포함 → 매칭 안 됨
+    const payload = {
+      action: "opened",
+      pull_request: {
+        number: prNumber,
+        title: "[OPS-999] should not touch OPS from DEV-mapped repo",
+        html_url: `https://github.com/${SCOPED_REPO}/pull/${prNumber}`,
+        merged: false,
+        state: "open",
+        head: { ref: "feature/ops-999" },
+      },
+      repository: { full_name: SCOPED_REPO },
+    };
+    const body = JSON.stringify(payload);
+
+    const res = await page.request.post("/api/webhooks/github", {
+      headers: {
+        "x-github-event": "pull_request",
+        "x-hub-signature-256": signBody(body),
+        "content-type": "application/json",
+      },
+      data: body,
+    });
+    expect(res.status()).toBe(200);
+    const json = await res.json();
+    expect(json.mode).toBe("scoped");
+    expect(json.matched).toBe(0);
+  });
+
+  test("scoped mode: cross-project PR only touches the mapped project", async ({
+    page,
+  }) => {
+    const issue = await ensureIssue(page);
+    const devKey = `${PROJECT_KEY}-${issue.issueNumber}`;
+    const prNumber = Date.now() + 2;
+
+    const payload = {
+      action: "opened",
+      pull_request: {
+        number: prNumber,
+        title: `[${devKey}] and [OPS-999] cross-project`,
+        html_url: `https://github.com/${SCOPED_REPO}/pull/${prNumber}`,
+        merged: false,
+        state: "open",
+        head: { ref: `feature/${devKey.toLowerCase()}-ops-999` },
+      },
+      repository: { full_name: SCOPED_REPO },
+    };
+    const body = JSON.stringify(payload);
+
+    const res = await page.request.post("/api/webhooks/github", {
+      headers: {
+        "x-github-event": "pull_request",
+        "x-hub-signature-256": signBody(body),
+        "content-type": "application/json",
+      },
+      data: body,
+    });
+    expect(res.status()).toBe(200);
+    const json = await res.json();
+    expect(json.mode).toBe("scoped");
+    // DEV-N만 매칭, OPS-999는 scoped에서 제외
+    expect(json.matched).toBe(1);
   });
 });

@@ -32,7 +32,7 @@ interface PullRequestPayload {
     state: string;
     head: { ref: string };
   };
-  repository: { full_name: string };
+  repository?: { full_name: string };
 }
 
 // 이슈 키 패턴: DEV-123, ABC-1 등
@@ -93,20 +93,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "pull_request 필드 누락" }, { status: 400 });
   }
 
+  // 라우팅 모드: repository.full_name이 Project.githubRepo와 매칭되면 "scoped"(해당 프로젝트만),
+  // 아니면 기존 key-prefix 기반 "legacy" 폴백.
+  const repoFullName = payload.repository?.full_name ?? null;
+  const scopedProject = repoFullName
+    ? await prisma.project.findFirst({
+        where: { githubRepo: repoFullName },
+        select: { id: true, key: true },
+      })
+    : null;
+  const mode: "scoped" | "legacy" = scopedProject ? "scoped" : "legacy";
+
   const keys = extractIssueKeys(pr.title, pr.head?.ref ?? "");
   if (keys.length === 0) {
-    return NextResponse.json({ ok: true, matched: 0 });
+    return NextResponse.json({ ok: true, matched: 0, mode });
   }
 
   const status = mapPrStatus(payload.action, pr.merged, pr.state);
   const shouldCloseIssue = pr.merged; // 머지되면 연결된 이슈 상태를 DONE으로
 
   let matched = 0;
+  const skippedKeys: string[] = [];
   for (const { key, number } of keys) {
-    const project = await prisma.project.findFirst({
-      where: { key },
-      select: { id: true },
-    });
+    let project: { id: string } | null;
+    if (scopedProject) {
+      // scoped 모드: 레포에 매핑된 프로젝트 키와 일치하는 이슈 키만 처리
+      if (key !== scopedProject.key) {
+        skippedKeys.push(`${key}-${number}`);
+        continue;
+      }
+      project = { id: scopedProject.id };
+    } else {
+      project = await prisma.project.findFirst({
+        where: { key },
+        select: { id: true },
+      });
+    }
     if (!project) continue;
 
     const issue = await prisma.issue.findUnique({
@@ -157,5 +179,20 @@ export async function POST(request: NextRequest) {
     matched++;
   }
 
-  return NextResponse.json({ ok: true, matched, event, action: payload.action });
+  if (skippedKeys.length > 0) {
+    console.info("[github-webhook] scoped 모드에서 프로젝트 외 키 스킵", {
+      scoped: scopedProject?.key,
+      repo: repoFullName,
+      skipped: skippedKeys,
+    });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    matched,
+    event,
+    action: payload.action,
+    mode,
+    ...(skippedKeys.length > 0 ? { skippedKeys } : {}),
+  });
 }
