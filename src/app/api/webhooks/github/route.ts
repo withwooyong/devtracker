@@ -34,6 +34,24 @@ interface PullRequestPayload {
   repository?: { full_name: string };
 }
 
+interface PushCommit {
+  id: string;
+  message: string;
+  url: string;
+}
+
+interface PushPayload {
+  ref?: string;
+  deleted?: boolean;
+  commits?: PushCommit[];
+  repository?: { full_name: string };
+}
+
+interface ScopedProjectLite {
+  id: string;
+  key: string;
+}
+
 // PR 작성자를 DevTracker User로 매핑. githubId 우선(로그인 변경 내성), 없으면 githubLogin로 매칭.
 // login으로 매칭됐을 때는 항상 githubId를 최신 값으로 덮어써서 다음 매칭부터는 id 경로로 즉시 찾히도록 한다.
 async function resolvePullRequestAuthor(
@@ -93,6 +111,236 @@ function mapPrStatus(action: string, merged: boolean, state: string) {
   return "open";
 }
 
+// scoped/legacy 공통 프로젝트 조회. scoped 모드는 key 불일치 시 null 반환(호출자가 skip 기록).
+async function resolveProjectForKey(
+  key: string,
+  scopedProject: ScopedProjectLite | null
+): Promise<{ id: string } | null> {
+  if (scopedProject) {
+    return key === scopedProject.key ? { id: scopedProject.id } : null;
+  }
+  return prisma.project.findFirst({ where: { key }, select: { id: true } });
+}
+
+async function handlePullRequest(
+  payload: PullRequestPayload,
+  scopedProject: ScopedProjectLite | null,
+  mode: "scoped" | "legacy",
+  secretSource: "project" | "global",
+  repoFullName: string | null
+) {
+  const pr = payload.pull_request;
+  if (!pr) {
+    return NextResponse.json(
+      { error: "pull_request 필드 누락" },
+      { status: 400 }
+    );
+  }
+
+  const keys = extractIssueKeys(pr.title, pr.head?.ref ?? "");
+  if (keys.length === 0) {
+    return NextResponse.json({ ok: true, matched: 0, mode, secretSource });
+  }
+
+  const status = mapPrStatus(payload.action, pr.merged, pr.state);
+  const shouldCloseIssue = pr.merged; // 머지되면 연결된 이슈 상태를 DONE으로
+
+  // PR 작성자를 DevTracker User로 매핑. 실패하면 reporter 폴백.
+  const prAuthor = await resolvePullRequestAuthor(pr.user);
+
+  let matched = 0;
+  const skippedKeys: string[] = [];
+  for (const { key, number } of keys) {
+    const project = await resolveProjectForKey(key, scopedProject);
+    if (!project) {
+      if (scopedProject) skippedKeys.push(`${key}-${number}`);
+      continue;
+    }
+
+    const issue = await prisma.issue.findUnique({
+      where: {
+        projectId_issueNumber: { projectId: project.id, issueNumber: number },
+      },
+      select: { id: true, status: true, assigneeId: true, reporterId: true },
+    });
+    if (!issue) continue;
+
+    await prisma.gitHubLink.upsert({
+      where: { issueId_url: { issueId: issue.id, url: pr.html_url } },
+      update: {
+        title: pr.title,
+        status,
+        externalId: String(pr.number),
+      },
+      create: {
+        issueId: issue.id,
+        type: "PR",
+        url: pr.html_url,
+        title: pr.title,
+        status,
+        externalId: String(pr.number),
+      },
+    });
+
+    if (shouldCloseIssue && issue.status !== "DONE") {
+      await prisma.issue.update({
+        where: { id: issue.id },
+        data: { status: "DONE", completedAt: new Date() },
+      });
+      // Activity userId: PR 작성자 매칭 성공 시 그 user, 실패 시 reporter 폴백
+      await prisma.activity.create({
+        data: {
+          issueId: issue.id,
+          userId: prAuthor?.id ?? issue.reporterId,
+          action: "STATUS_CHANGED",
+          field: "status",
+          oldValue: issue.status,
+          newValue: "DONE",
+        },
+      });
+    }
+
+    matched++;
+  }
+
+  if (skippedKeys.length > 0) {
+    console.info("[github-webhook] scoped 모드에서 프로젝트 외 키 스킵", {
+      event: "pull_request",
+      scoped: scopedProject?.key,
+      repo: repoFullName,
+      skipped: skippedKeys,
+    });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    matched,
+    event: "pull_request",
+    action: payload.action,
+    mode,
+    secretSource,
+    prAuthorMatched: Boolean(prAuthor),
+    ...(skippedKeys.length > 0 ? { skippedKeys } : {}),
+  });
+}
+
+async function handlePush(
+  payload: PushPayload,
+  scopedProject: ScopedProjectLite | null,
+  mode: "scoped" | "legacy",
+  secretSource: "project" | "global",
+  repoFullName: string | null
+) {
+  // 브랜치 삭제/force push로 commits가 비어있는 경우엔 연결 대상이 없음
+  if (payload.deleted) {
+    return NextResponse.json({
+      ok: true,
+      event: "push",
+      skipped: "deleted",
+      matched: 0,
+      commits: 0,
+      mode,
+      secretSource,
+    });
+  }
+
+  const commits = payload.commits ?? [];
+  if (commits.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      event: "push",
+      matched: 0,
+      commits: 0,
+      mode,
+      secretSource,
+    });
+  }
+
+  // 루프 진입 전 모든 commits의 이슈 키를 모아 project 조회를 1회로 묶는다(legacy N+1 방지).
+  const commitsWithKeys = commits.map((c) => ({
+    commit: c,
+    keys: extractIssueKeys(c.message),
+    // 커밋 메시지 1줄 요약을 title로 사용 (GitHubLink.title에 맞춰 200자 제한)
+    title:
+      c.message.split("\n", 1)[0].slice(0, 200) || c.id.slice(0, 7),
+  }));
+  const uniqueKeys = Array.from(
+    new Set(commitsWithKeys.flatMap(({ keys }) => keys.map((k) => k.key)))
+  );
+
+  const projectMap = new Map<string, { id: string }>();
+  if (uniqueKeys.length > 0) {
+    if (scopedProject) {
+      if (uniqueKeys.includes(scopedProject.key)) {
+        projectMap.set(scopedProject.key, { id: scopedProject.id });
+      }
+    } else {
+      const projects = await prisma.project.findMany({
+        where: { key: { in: uniqueKeys } },
+        select: { id: true, key: true },
+      });
+      for (const p of projects) projectMap.set(p.key, { id: p.id });
+    }
+  }
+
+  let matched = 0;
+  const skippedKeys = new Set<string>();
+
+  for (const { commit, keys, title } of commitsWithKeys) {
+    for (const { key, number } of keys) {
+      const project = projectMap.get(key) ?? null;
+      if (!project) {
+        if (scopedProject) skippedKeys.add(`${key}-${number}`);
+        continue;
+      }
+
+      const issue = await prisma.issue.findUnique({
+        where: {
+          projectId_issueNumber: { projectId: project.id, issueNumber: number },
+        },
+        select: { id: true },
+      });
+      if (!issue) continue;
+
+      // 중복 push 재전송 또는 rebase로 인한 재송신에도 안전하도록 (issueId,url) 기준 upsert.
+      // 커밋에는 자연스러운 status가 없어 null로 둔다(PR과 구분).
+      await prisma.gitHubLink.upsert({
+        where: { issueId_url: { issueId: issue.id, url: commit.url } },
+        update: { title, externalId: commit.id },
+        create: {
+          issueId: issue.id,
+          type: "COMMIT",
+          url: commit.url,
+          title,
+          status: null,
+          externalId: commit.id,
+        },
+      });
+      matched++;
+    }
+  }
+
+  const skippedList = Array.from(skippedKeys);
+  if (skippedList.length > 0) {
+    console.info("[github-webhook] scoped 모드에서 프로젝트 외 키 스킵", {
+      event: "push",
+      scoped: scopedProject?.key,
+      repo: repoFullName,
+      skipped: skippedList,
+    });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    event: "push",
+    matched,
+    commits: commits.length,
+    mode,
+    secretSource,
+    ...(skippedList.length > 0 ? { skippedKeys: skippedList } : {}),
+  });
+}
+
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
@@ -104,12 +352,14 @@ export async function POST(request: NextRequest) {
   //    - 그 외(프로젝트 secret 미설정, legacy, ping 등)에는 전역 `GITHUB_WEBHOOK_SECRET`를 사용한다.
   //    body 파싱은 검증 전에 한 번 해야 하는데, 이 시점에는 아직 신뢰 불가한 입력이다.
   //    JSON.parse 외에는 DB 질의(repo 문자열 완전일치)만 수행하며, 검증 실패 시 401로 차단한다.
-  let parsedBody: PullRequestPayload | { repository?: { full_name: string } } | null =
-    null;
+  let parsedBody:
+    | PullRequestPayload
+    | PushPayload
+    | { repository?: { full_name: string } }
+    | null = null;
   try {
-    parsedBody = JSON.parse(rawBody) as PullRequestPayload;
+    parsedBody = JSON.parse(rawBody) as PullRequestPayload | PushPayload;
   } catch {
-    // ping 이외의 이벤트는 아래에서 JSON 재파싱 실패 시 400으로 처리
     parsedBody = null;
   }
 
@@ -150,122 +400,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, event: "ping" });
   }
 
-  if (event !== "pull_request") {
-    return NextResponse.json({ ok: true, skipped: event });
-  }
-
-  // 여기 도달 시점에는 서명이 유효하므로 parsedBody는 신뢰 가능하지만, 구조 검증은 별도.
-  const payload = parsedBody as PullRequestPayload | null;
-  if (!payload) {
-    return NextResponse.json(
-      { error: "JSON 파싱에 실패했습니다." },
-      { status: 400 }
-    );
-  }
-
-  const pr = payload.pull_request;
-  if (!pr) {
-    return NextResponse.json({ error: "pull_request 필드 누락" }, { status: 400 });
-  }
-
-  // 라우팅 모드: scopedProject가 있으면 "scoped"(해당 프로젝트만),
-  // 없으면 기존 key-prefix 기반 "legacy" 폴백.
   const mode: "scoped" | "legacy" = scopedProject ? "scoped" : "legacy";
+  const lite: ScopedProjectLite | null = scopedProject
+    ? { id: scopedProject.id, key: scopedProject.key }
+    : null;
 
-  const keys = extractIssueKeys(pr.title, pr.head?.ref ?? "");
-  if (keys.length === 0) {
-    return NextResponse.json({ ok: true, matched: 0, mode, secretSource });
-  }
-
-  const status = mapPrStatus(payload.action, pr.merged, pr.state);
-  const shouldCloseIssue = pr.merged; // 머지되면 연결된 이슈 상태를 DONE으로
-
-  // PR 작성자를 DevTracker User로 매핑. 실패하면 reporter 폴백.
-  const prAuthor = await resolvePullRequestAuthor(pr.user);
-
-  let matched = 0;
-  const skippedKeys: string[] = [];
-  for (const { key, number } of keys) {
-    let project: { id: string } | null;
-    if (scopedProject) {
-      // scoped 모드: 레포에 매핑된 프로젝트 키와 일치하는 이슈 키만 처리
-      if (key !== scopedProject.key) {
-        skippedKeys.push(`${key}-${number}`);
-        continue;
-      }
-      project = { id: scopedProject.id };
-    } else {
-      project = await prisma.project.findFirst({
-        where: { key },
-        select: { id: true },
-      });
+  if (event === "pull_request") {
+    const payload = parsedBody as PullRequestPayload | null;
+    if (!payload) {
+      return NextResponse.json(
+        { error: "JSON 파싱에 실패했습니다." },
+        { status: 400 }
+      );
     }
-    if (!project) continue;
+    return handlePullRequest(payload, lite, mode, secretSource, repoFullName);
+  }
 
-    const issue = await prisma.issue.findUnique({
-      where: {
-        projectId_issueNumber: { projectId: project.id, issueNumber: number },
-      },
-      select: { id: true, status: true, assigneeId: true, reporterId: true },
-    });
-    if (!issue) continue;
-
-    await prisma.gitHubLink.upsert({
-      where: {
-        issueId_url: { issueId: issue.id, url: pr.html_url },
-      },
-      update: {
-        title: pr.title,
-        status,
-        externalId: String(pr.number),
-      },
-      create: {
-        issueId: issue.id,
-        type: "PR",
-        url: pr.html_url,
-        title: pr.title,
-        status,
-        externalId: String(pr.number),
-      },
-    });
-
-    if (shouldCloseIssue && issue.status !== "DONE") {
-      await prisma.issue.update({
-        where: { id: issue.id },
-        data: { status: "DONE", completedAt: new Date() },
-      });
-      // Activity userId: PR 작성자 매칭 성공 시 그 user, 실패 시 reporter 폴백
-      await prisma.activity.create({
-        data: {
-          issueId: issue.id,
-          userId: prAuthor?.id ?? issue.reporterId,
-          action: "STATUS_CHANGED",
-          field: "status",
-          oldValue: issue.status,
-          newValue: "DONE",
-        },
-      });
+  if (event === "push") {
+    const payload = parsedBody as PushPayload | null;
+    if (!payload) {
+      return NextResponse.json(
+        { error: "JSON 파싱에 실패했습니다." },
+        { status: 400 }
+      );
     }
-
-    matched++;
+    return handlePush(payload, lite, mode, secretSource, repoFullName);
   }
 
-  if (skippedKeys.length > 0) {
-    console.info("[github-webhook] scoped 모드에서 프로젝트 외 키 스킵", {
-      scoped: scopedProject?.key,
-      repo: repoFullName,
-      skipped: skippedKeys,
-    });
-  }
-
-  return NextResponse.json({
-    ok: true,
-    matched,
-    event,
-    action: payload.action,
-    mode,
-    secretSource,
-    prAuthorMatched: Boolean(prAuthor),
-    ...(skippedKeys.length > 0 ? { skippedKeys } : {}),
-  });
+  return NextResponse.json({ ok: true, skipped: event });
 }

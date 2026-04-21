@@ -415,11 +415,14 @@ PR 제목이나 브랜치명에 이슈 키(`DEV-123` 형태)를 포함하면 자
 | PR Opened | 이슈 상세의 **GitHub** 섹션에 PR 링크 + "열림" 상태 표시 |
 | PR Closed | 상태 "닫힘"으로 변경 |
 | PR Merged | 이슈 상태를 **DONE**으로 자동 전환 + Activity 기록 |
+| Push (commit) | 커밋 메시지에 이슈 키가 있으면 **GitHub** 섹션에 커밋 링크 추가 (이슈 상태는 변경하지 않음) |
 
 ### 10-3. 주의사항
 
 - Webhook은 관리자가 설정한 단일 GitHub 레포에만 연결됨 (현재: `withwooyong/devtracker`)
 - PR에 이슈 키가 없으면 자동 연결은 되지 않음 (PR 제목 기준)
+- Push 이벤트는 커밋 메시지 기준으로 연결. 브랜치 삭제나 빈 push는 조용히 무시됩니다
+- 이슈 상태 변경(DONE 전환)은 PR Merge에서만 발생 — push 이벤트는 커밋 링크만 추가합니다
 
 ### 10-4. GitHub 계정 연결(사용자 매핑)
 
