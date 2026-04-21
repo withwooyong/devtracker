@@ -48,3 +48,6 @@ prisma/dev.db-journal
 /playwright-report/
 /test-results/
 .env*.local
+
+# claude code (개인 설정 — 팀 공유 필요한 값은 .claude/settings.json에 넣기)
+.claude/settings.local.json

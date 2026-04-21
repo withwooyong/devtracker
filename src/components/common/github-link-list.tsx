@@ -5,7 +5,11 @@ import {
   type GitHubLink,
   GITHUB_LINK_STATUS_COLORS,
   GITHUB_LINK_STATUS_LABELS,
+  GITHUB_LINK_TYPE_COLORS,
+  GITHUB_LINK_TYPE_LABELS,
+  formatGitHubLinkExternalHint,
   type GitHubLinkStatus,
+  type GitHubLinkType,
 } from "@/types/github-link";
 
 interface Props {
@@ -31,7 +35,10 @@ export function GitHubLinkList({ projectKey, issueNumber, issueId }: Props) {
   if (!isLoading && links.length === 0) return null;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg">
+    <div
+      data-testid="github-link-section"
+      className="bg-white border border-gray-200 rounded-lg"
+    >
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
         <h3 className="text-sm font-semibold text-gray-800">
           GitHub{" "}
@@ -42,32 +49,55 @@ export function GitHubLinkList({ projectKey, issueNumber, issueId }: Props) {
         {isLoading ? (
           <li className="px-4 py-3 text-xs text-gray-400">불러오는 중…</li>
         ) : (
-          links.map((link) => (
-            <li key={link.id} className="px-4 py-2.5 flex items-center gap-3">
-              <span className="text-xs font-mono text-gray-400 w-10">
-                {link.type}
-              </span>
-              <a
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 text-sm text-gray-800 hover:text-blue-600 truncate"
+          links.map((link) => {
+            const type = link.type as GitHubLinkType;
+            const hint = formatGitHubLinkExternalHint(type, link.externalId);
+            return (
+              <li
+                key={link.id}
+                className="px-4 py-2.5 flex items-center gap-3"
               >
-                {link.title}
-              </a>
-              {link.status && (
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full ${
-                    GITHUB_LINK_STATUS_COLORS[link.status as GitHubLinkStatus] ??
-                    "bg-gray-100 text-gray-600"
+                  data-testid={`gh-link-type-${link.id}`}
+                  className={`text-[11px] leading-4 font-medium px-1.5 py-0.5 rounded ${
+                    GITHUB_LINK_TYPE_COLORS[type] ??
+                    "bg-gray-50 text-gray-600 border border-gray-200"
                   }`}
                 >
-                  {GITHUB_LINK_STATUS_LABELS[link.status as GitHubLinkStatus] ??
-                    link.status}
+                  {GITHUB_LINK_TYPE_LABELS[type] ?? link.type}
                 </span>
-              )}
-            </li>
-          ))
+                {hint && (
+                  <span
+                    data-testid={`gh-link-hint-${link.id}`}
+                    className="text-xs font-mono text-gray-400"
+                  >
+                    {hint}
+                  </span>
+                )}
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 text-sm text-gray-800 hover:text-blue-600 truncate"
+                >
+                  {link.title}
+                </a>
+                {link.status && (
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full ${
+                      GITHUB_LINK_STATUS_COLORS[
+                        link.status as GitHubLinkStatus
+                      ] ?? "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {GITHUB_LINK_STATUS_LABELS[
+                      link.status as GitHubLinkStatus
+                    ] ?? link.status}
+                  </span>
+                )}
+              </li>
+            );
+          })
         )}
       </ul>
     </div>
