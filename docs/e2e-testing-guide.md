@@ -46,7 +46,7 @@ tests/e2e/
 playwright.config.ts               # Playwright 설정
 ```
 
-## 현재 테스트 목록 (48개, 12개 Journey)
+## 현재 테스트 목록 (51개, 12개 Journey — 10b 하위 묶음 포함)
 
 | Journey | Spec 파일 | 테스트 수 |
 |---------|-----------|-----------|
@@ -58,7 +58,8 @@ playwright.config.ts               # Playwright 설정
 | 7. 저장된 필터 | saved-filters.spec.ts | 6 |
 | 8. 스프린트 라이프사이클 | sprints.spec.ts | 6 |
 | 9. 이슈 첨부파일 (Vercel Blob Private) | attachments.spec.ts | 7 |
-| 10. GitHub Webhook | github-webhook.spec.ts | 6 |
+| 10. GitHub Webhook (legacy) | github-webhook.spec.ts | 6 |
+| 10b. GitHub Webhook (하이브리드 scoped) | github-webhook.spec.ts | 3 |
 | 11. 알림 Outbox | notification-outbox.spec.ts | 4 |
 | 12. 프로젝트 설정 | project-settings.spec.ts | 5 |
 

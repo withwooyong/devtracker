@@ -3,6 +3,22 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-21] GitHub webhook 하이브리드 라우팅
+
+### Added
+- `src/app/api/webhooks/github/route.ts`: `Project.githubRepo`와 `payload.repository.full_name`이 매칭되면 "scoped" 모드로 해당 프로젝트 이슈만 처리. 매칭 없으면 기존 "legacy" 키-prefix 경로로 폴백 (`03c0ec7`)
+- scoped 모드의 cross-project silent drop을 `skippedKeys` 응답 필드 + `console.info` 로그로 관측성 보강
+- 응답에 `mode: "scoped" | "legacy"` 필드 추가
+- E2E Journey 10b × 3건: scoped 매칭, scoped 다른 키 무시, scoped cross-project 부분 처리 (`03c0ec7`) — 총 51개
+- ADR-020 신규 (하이브리드 라우팅 결정 기록)
+
+### Changed
+- `PullRequestPayload.repository`를 optional로 변경(`?: { full_name: string }`) — GitHub이 필드를 누락해도 null-safe하게 legacy로 폴백
+- E2E `beforeAll/afterAll`을 `playwright.request.newContext()`로 독립 세션화, `afterAll` 복원 응답 status 검증 추가 (쿠키 격리 불확실성 제거, 테스트 상태 오염 방지)
+- `docs/e2e-testing-guide.md` 48개/12 Journey → 51개/12 Journey(10b 하위 묶음) 반영
+
+---
+
 ## [2026-04-21] 프로젝트 설정 페이지 1차
 
 ### Added
