@@ -3,6 +3,48 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-22] 13-3차 ~ 13-7차 — 칸반 보드 안정화 + 대댓글 + UI 정비
+
+### Added
+- `src/components/common/user-avatar.tsx` — `avatarUrl` 있으면 이미지, 없으면 이름 해시 기반 16색 팔레트 + 이니셜. size xs/sm/md — `5dc4c98`
+- `Comment.parentId String?` + self relation(`CommentReplies`) + `@@index([parentId])`로 댓글 대댓글 1-depth 구조. Turso는 `ALTER TABLE Comment ADD COLUMN parentId TEXT` + 인덱스로 먼저 마이그 — `60a2e40`
+- POST `/comments` `parentId` 옵션 수신 + parent 존재/같은 이슈/1-depth 검증 — `60a2e40`
+- 알림 `recipients`에 parent 댓글 작성자 추가(본인 제외), title "새 답글" 구분 — `60a2e40`
+- 댓글 탭에 답글 트리 렌더(`ml-10` 들여쓰기) + "답글" 토글 버튼 + 답글 폼. 전체 탭에 `c.parentId ? "답글" : "댓글"` 배지 — `60a2e40` + `5dc4c98`
+- ADR-027 "`$executeRaw` + CASE WHEN 단일 UPDATE" + ADR-028 "대댓글 1-depth 구조" 추가 — 금회 /handoff
+- user-guide.md에 답글 작성 섹션 추가 — 금회 /handoff
+
+### Changed
+- `src/app/api/projects/[projectId]/board/route.ts`: `$transaction([...N update])` → `$executeRaw` + `UPDATE ... CASE WHEN` 단일 문. `Prisma.sql`/`Prisma.join`으로 파라미터 바인딩, `updatedAt` 명시 세팅. libSQL RTT 누적으로 Prisma 인터랙티브 트랜잭션 5초 타임아웃 초과(P2028)를 근본 해결 — `8a1cc2b`
+- `src/app/projects/[projectKey]/board/page.tsx` `boardMutation`: React Query **optimistic update**(`onMutate` + `setQueryData`) + `onError` 롤백 + `onSettled` invalidate. `mutationFn`에 `res.ok` 체크 + throw로 에러 surface — `e47d976`
+- `src/components/issues/issue-card.tsx`, 보드 데스크톱/모바일 칸반 카드 `<Link>` 3곳에 `prefetch={false}` — viewport 자동 RSC prefetch로 카드 N개 = Vercel λ N회 호출되던 비용 제거 — `e47d976`
+- `KanbanColumn`의 `useSortable({ disabled: true })` → `useDroppable`로 교체. `handleDragEnd` same-column 분기를 `@dnd-kit/sortable`의 `arrayMove` 유틸로 재작성. `activeId === overId` / `oldIndex === newIndex` early return 추가 — 같은 컬럼 내 순서 변경이 동작하도록 — `088e565`
+- `src/components/common/rich-editor.tsx`: `EditorContent`에 `text-gray-900` + ProseMirror 내부 요소별 색상 명시(prose 기본 중간 회색 override). `onChange?` optional, `editable={false}` 시 border/focus-ring/padding 제거 → 순수 뷰어 모드 — `ce3eaf4`
+- `src/app/projects/[projectKey]/issues/[issueNumber]/page.tsx`: description 렌더를 `<pre-wrap>`에서 `<RichEditor editable={false} />`로 교체. XSS 안전(Tiptap schema 기반, `dangerouslySetInnerHTML` 미사용) — `ce3eaf4`
+- 이슈 상세 아바타 3곳(댓글/답글/전체 탭)을 `<UserAvatar />`로 교체. 라벨 gray-500→600, 값/이름 gray-700→900, 시간 gray-400→500, 비활성 탭 gray-500/700→600/900, 뒤로가기/편집 버튼 gray-500→600으로 가독성 상향 — `5dc4c98`
+- `prisma/seed.ts` users 배열 `"Ted"` → `"허우용"` 9곳 일괄 변경(seed 재실행 시 DB 이름이 덮어써지지 않도록). `src/app/login/page.tsx` 테스트 계정 안내 `(Ted)` → `(허우용)` — `21e764f`
+- Turso User 테이블 직접 UPDATE: `withwooyong@yanadoocorp.com` → `허우용`, `Ted@yanadoocorp.com` → `테드` (DB 정정)
+
+### Fixed
+- 칸반 드래그 시 `PATCH /api/projects/[projectId]/board` 500 Internal Server Error — libSQL 직렬 RTT 누적으로 Prisma 인터랙티브 트랜잭션 5초 타임아웃 초과. ADR-027 참조 — `8a1cc2b`
+- 드래그 후 카드가 즉시 반영되지 않고 서버 왕복 후에야 이동해 "굉장히 느려" 보이던 문제 — optimistic UI로 즉시 반영 — `e47d976`
+- 500 응답인데도 에러가 삼켜지던 문제 — `fetch` 결과 `r.ok` 미체크가 원인. throw로 React Query `onError` 정상 발동 — `e47d976`
+- 보드 진입 시 카드별 `_rsc=` prefetch로 Vercel λ가 카드 수만큼 호출되던 비용 — `prefetch={false}` — `e47d976`
+- 같은 컬럼 내 카드 순서 변경이 불가하던 문제 — `useSortable({ disabled })` 오용 + splice 두 번 꼬임. `useDroppable` + `arrayMove` 표준 패턴 적용 — `088e565`
+- 이슈 생성 화면 설명 에디터 폰트 흐림 — prose 기본 색상 override — `ce3eaf4`
+- 이슈 상세에서 HTML 태그가 plain text로 노출되던 문제 — RichEditor 뷰어 모드로 재사용 — `ce3eaf4`
+- 댓글/답글 작성자가 모두 "Ted"로 보이던 문제(원인: 두 유저 모두 이름이 "Ted"로 저장됨) — Turso UPDATE로 정정 + UserAvatar 도입 + seed 하드코딩 수정 — `5dc4c98` + `21e764f`
+
+### 배포
+- `dpl_3DcYXFihm8BKBQ6CwnzDDXWRjPq6` (8a1cc2b)
+- `dpl_3yZNBaWUHc1ffcWkqrr64jNTxs7R` (e47d976)
+- `dpl_5SSEDHy4hjbbRgmfzNCk6jDt1FWa` (088e565)
+- `dpl_2Hi4AMX23Ya5Z8c9rX8BVkBN8k9N` (ce3eaf4)
+- `dpl_JANrLuG8cTNQULt6qofDGmv9PvEj` (60a2e40)
+- 금회 `21e764f` 재배포
+
+---
+
 ## [2026-04-22 후속] 칸반 드래그 500 진단용 로깅 (진행 중)
 
 ### Added

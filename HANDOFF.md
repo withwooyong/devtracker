@@ -1,145 +1,95 @@
 # Session Handoff
 
-> Last updated: 2026-04-22 (KST, 13-7차 — UserAvatar 컴포넌트 + 이슈 상세 가독성)
+> Last updated: 2026-04-23 (KST, /handoff)
 > Branch: `main`
-> Latest commit: 금회 커밋 — feat: UserAvatar + 이슈 상세 페이지 가독성 개선
+> Latest commit: `21e764f` — chore: seed/테스트 안내의 하드코딩 "Ted"를 "허우용"으로 정정
 > Production: https://devtracker-dusky.vercel.app
-> 최신 배포: 금회 재배포 예정 (직전: `dpl_JANrLuG8cTNQULt6qofDGmv9PvEj`)
+> 최신 배포: `21e764f` 기준 production 배포 완료 (직전 `dpl_JANrLuG8cTNQULt6qofDGmv9PvEj`)
 
 ## Current Status
 
-**✅ 칸반 보드 드래그 500 해결 + 반응속도/비용 튜닝 + 같은 컬럼 순서 변경 수정 완료**. 13-2차에서 남긴 로깅 패치(`dcfdf33`)로 `vercel logs`에서 원인 포착 → Prisma `$transaction([...N update])`이 libSQL(Turso) RTT 누적으로 **5초 인터랙티브 트랜잭션 타임아웃(P2028)** 초과. `prisma.$executeRaw` + `CASE WHEN` 단일 UPDATE(`8a1cc2b`)로 1 RTT로 압축. 13-3차에서 optimistic UI + `r.ok` 체크 + `prefetch={false}`로 반응속도/비용 튜닝(`e47d976`). 13-4차(금회)에서 같은 컬럼 내 카드 순서 변경이 작동 안 하던 이슈 수정 — `KanbanColumn`에 `useSortable({ disabled: true })`를 잘못 사용한 것을 `useDroppable`로 교체하고, `handleDragEnd`의 splice 두 번 꼬임을 `@dnd-kit/sortable`의 `arrayMove` 유틸로 단순화. 제자리 드래그 early return도 추가.
+**✅ 칸반 보드 안정화 + 대댓글 구조 + UI 정비 완료**. 13-2차에서 미해결 상태로 남겼던 **칸반 드래그 500**을 13-3차에 원인 확정(libSQL RTT 누적 → P2028)하고 `$executeRaw` + `CASE WHEN` 단일 UPDATE로 근본 해결(`8a1cc2b`). 이어 반응속도/비용 튜닝(optimistic UI + r.ok + prefetch=false, `e47d976`), 같은 컬럼 순서 변경 동작(`useDroppable` + `arrayMove`, `088e565`)까지 진행. 이슈 상세 영역에서는 RichEditor 가독성(`ce3eaf4`), 댓글 대댓글 1-depth 구조(`60a2e40`), UserAvatar + 페이지 색상 상향(`5dc4c98`), seed/테스트 안내 "Ted" 하드코딩 정리(`21e764f`)까지 마무리. 주요 결정은 ADR-027/028에 기록. 커밋·푸시·재배포 모두 완료, 미커밋 변경 없음.
 
-## Completed This Session (2026-04-22, 13-7차)
+## Completed This Session (2026-04-22 13-3차 ~ 13-7차)
 
-| # | Task | 커밋 |
-|---|------|------|
-| 1 | 사용자 제보: (a) 아바타 이니셜이 모두 'T'로 동일해 구분 불가(이름 첫글자 공유 + `bg-blue-500` 고정), (b) 이슈 상세 페이지 전반 색상이 흐려 가독성 나쁨 | — |
-| 2 | `components/common/user-avatar.tsx` 신설: `avatarUrl` 있으면 `<img>`, 없으면 이름 해시 기반 16색 팔레트에서 색상 선택 + 이니셜. `size: "xs" | "sm" | "md"` 3단계 | 금회 |
-| 3 | 이슈 상세 아바타 3곳(댓글/답글/전체 탭)을 `<UserAvatar />`로 교체 — 이름이 달라지면 색상이 달라져 구분 가능 | 금회 |
-| 4 | 이슈 상세 색상 일괄 상향: 라벨 gray-500→600, 값/이름 gray-700→900, 시간 gray-400→500, 비활성 탭 gray-500/700→600/900, 뒤로가기/편집 버튼 gray-500→600 | 금회 |
-| 5 | 전체 탭 답글 구분 배지 추가(기존 Known Issue 해소): `c.parentId ? "답글" : "댓글"` | 금회 |
-| 6 | HANDOFF.md 업데이트, 커밋·푸시·재배포 | 금회 |
-
-### 직전 세션 (13-6차)
-
-| # | Task | 커밋 |
-|---|------|------|
-| 1 | 댓글 대댓글 1-depth 구조 (Turso ALTER TABLE + Prisma schema + API + 트리 UI + 알림 상위 작성자 추가) | `60a2e40` |
-
-### 직전 세션 (13-5차)
-
-| # | Task | 커밋 |
-|---|------|------|
-| 1 | `rich-editor.tsx` — `text-gray-900` + ProseMirror 요소별 색상 명시로 가독성 개선 + `onChange?` optional + editable=false 뷰어 모드 | `ce3eaf4` |
-| 2 | `issues/[issueNumber]/page.tsx` — description 렌더를 `<RichEditor editable={false} />`로 교체 (XSS 안전) | `ce3eaf4` |
-
-### 직전 세션 (13-4차)
-
-| # | Task | 커밋 |
-|---|------|------|
-| 1 | 같은 컬럼 내 카드 순서 변경 불가 수정. `KanbanColumn` `useSortable({disabled:true})` → `useDroppable`로 교체 + `handleDragEnd`를 `arrayMove`로 재작성 | `088e565` |
-
-### 직전 세션 (13-3차)
-
-| # | Task | 커밋 |
-|---|------|------|
-| 1 | `vercel logs ... --status-code=500 --expand`로 실제 스택 확보. 원인: `Transaction API error: A rollback cannot be executed on an expired transaction. timeout 5000ms, timeTaken 5201~5952ms` (Prisma P2028) | — |
-| 2 | `board/route.ts` — `$transaction([...update])` 배치 → `prisma.$executeRaw` + `CASE WHEN` 단일 UPDATE. `Prisma.sql`/`Prisma.join` 파라미터 바인딩으로 SQL injection 안전. `updatedAt` 명시 세팅 | `8a1cc2b` |
-| 3 | `board/page.tsx` `boardMutation` — optimistic update + onError 롤백 + onSettled invalidate. `mutationFn`에 `res.ok` 체크 + throw | `e47d976` |
-| 4 | `IssueCard` + 보드 카드 `<Link>` 3곳에 `prefetch={false}` | `e47d976` |
-
-### 직전 세션 (13-2차, 같은 날)
-
-| # | Task | 커밋 |
-|---|------|------|
-| 1 | 프로덕션 Vercel 자동 배포가 트리거 안 된 상황을 `vercel ls`로 확인 → `vercel --prod --yes`로 수동 재배포 | — |
-| 2 | 칸반 드래그 상태 이동 실패, "클라이언트 OK, 서버 500" 확정 | — |
-| 3 | `board/route.ts` catch 블록에 `console.error("[board PATCH]", error)` 로깅 | `dcfdf33` |
-
-### 직전 세션 (13차, 같은 날)
-
-| Phase | 커밋 | 내용 |
-|-------|------|------|
-| 1~2 | `f45dc57` | viewport + useUIStore/useMediaQuery + 사이드바 드로어화 |
-| 3 | `b4277b2` | ProjectTabs 공통화 |
-| 4 | `d858091` | 이슈 목록 카드 뷰 + 필터 바 세로 스택 |
-| 5 | `aa0dae7` | 이슈 상세 1열 전환 |
-| 6 | `1909ff7` | 칸반 보드 DnD 대신 상태 pill + 카드 select (ADR-026) |
-| 7-a | `5dcdd0f` | 배포/스프린트/설정 정돈 + h1 suffix 제거 |
-| 7-b | `3371ca6` | 스프린트 상세 + burndown |
-| 8 | `644f22c` | 로그인/프로젝트 목록/에러 페이지 |
-| 9 | `7ed3bdf` | Playwright 모바일 프로젝트 + 스모크 스펙 4종 |
-| /handoff | `955a696` | 모바일 반응형 9 Phase CHANGELOG/HANDOFF + e2e 가이드 73개 |
+| # | Task | Commit |
+|---|------|--------|
+| 1 | 칸반 드래그 500 원인 확정 (`vercel logs --status-code=500 --expand` → Prisma P2028, timeout 5000ms / timeTaken 5201~5952ms) | — |
+| 2 | `board/route.ts` — `$transaction([...N])` → `$executeRaw` + `CASE WHEN` 단일 UPDATE. Prisma.sql/Prisma.join 파라미터 바인딩 + updatedAt 명시 세팅 | `8a1cc2b` |
+| 3 | `boardMutation` — optimistic update + 롤백 + res.ok 체크 / 보드 카드 `<Link>` 3곳 `prefetch={false}` | `e47d976` |
+| 4 | KanbanColumn useSortable→useDroppable 교체 + handleDragEnd arrayMove로 재작성 (같은 컬럼 순서 변경 동작) | `088e565` |
+| 5 | RichEditor text-gray-900 + 요소별 색상 + editable=false 뷰어 모드 / 이슈 상세 description을 RichEditor로 렌더 | `ce3eaf4` |
+| 6 | Comment.parentId + self relation + @@index (Turso ALTER TABLE 먼저) / POST parentId 검증 + 1-depth + 상위 작성자 알림 / 트리 UI + 답글 폼 | `60a2e40` |
+| 7 | UserAvatar 컴포넌트 신설(avatarUrl 또는 해시색상+이니셜) / 이슈 상세 아바타 3곳 교체 / 색상 전반 상향 / 전체 탭 답글 배지 | `5dc4c98` |
+| 8 | Turso User 이름 정정 (withwooyong→허우용, Ted→테드) + seed.ts "Ted" 9곳→"허우용" + login 테스트 안내 정정 | `21e764f` |
+| 9 | ADR-027/028 추가 + user-guide.md 답글 섹션 추가 + CHANGELOG/HANDOFF 업데이트 | 금회 /handoff |
 
 ## Recent Commits
 
 ```
-금회     feat: UserAvatar + 이슈 상세 페이지 가독성 개선
+21e764f  chore: seed/테스트 안내의 하드코딩 "Ted"를 "허우용"으로 정정
+5dc4c98  feat: UserAvatar + 이슈 상세 페이지 가독성 개선
 60a2e40  feat: 댓글 대댓글 1-depth 구조 (스키마 + API + 트리 UI + 알림)
 ce3eaf4  fix: 이슈 설명 에디터 가독성 + 상세 뷰 RichEditor 재사용
 088e565  fix: 칸반 같은 컬럼 내 순서 변경 동작 (useDroppable + arrayMove)
 e47d976  fix: 칸반 보드 반응속도/비용 튜닝 (optimistic UI + r.ok + prefetch=false)
+8a1cc2b  fix: 칸반 보드 PATCH Prisma 트랜잭션 타임아웃 해소 (Raw SQL CASE WHEN)
 dcfdf33  debug: board PATCH catch 블록에 console.error 추가
-955a696  /handoff: 모바일 반응형 9 Phase CHANGELOG/HANDOFF + e2e 가이드 73개
-7ed3bdf  모바일 반응형 Phase 9: Playwright 모바일 프로젝트 + 스모크 스펙 4종
-644f22c  모바일 반응형 Phase 8: 로그인/프로젝트 목록/에러 페이지 정돈
-3371ca6  모바일 반응형 Phase 7-b: 스프린트 상세 + burndown 차트 반응형
-5dcdd0f  모바일 반응형 Phase 7-a: 배포/스프린트/설정 정돈 + h1 suffix 일괄 제거
-1909ff7  모바일 반응형 Phase 6: 칸반 보드 DnD 대신 상태 pill + 카드 select
-aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 ```
 
 ## Key Decisions
 
-### 모바일 반응형 9 Phase (완료, 13차)
-- **CSS 분기 > JS 분기** (ADR-026): `useMediaQuery`로 조건부 렌더 대신 `md:hidden` / `hidden md:block` 두 블록 공존. SSR 플래시·DnDContext 재마운트·테스트 안정성 모두 해결
-- **모바일 칸반 = 상태 변경, DnD ≠ 본질**: 드래그는 데스크톱 표현 방식. 모바일은 `<select>` + `handleMobileStatusChange`로 기존 `boardMutation` 재사용
-- **ARIA 선언만 ≠ 동작 완성**: role+aria-selected를 붙였다가 roving tabindex + 화살표 키 핸들러 없이는 AT에 혼란 → 제거 (Phase 5·6 일관)
-- **h1은 프로젝트 이름만, 페이지는 탭이 식별** (Phase 7-a)
+### 칸반 보드 batch update: `$executeRaw` + CASE WHEN (ADR-027)
+- libSQL 원격 어댑터가 `$transaction([...N update])`의 update들을 **직렬로** RTT 왕복 → 한국↔도쿄 RTT × N이 5초 타임아웃 초과 (P2028)
+- 해결: 단일 `UPDATE ... CASE id WHEN ... END` 1 RTT. items가 몇 개든 안전. SQLite 단일 UPDATE는 원자적이라 기존 multi-step txn보다 오히려 안전
+- `Prisma.sql`/`Prisma.join` 파라미터 바인딩으로 injection 안전. `updatedAt` 명시 세팅(raw는 `@updatedAt` 훅 우회)
 
-### 칸반 드래그 500 해결 + 성능 튜닝 (완료, 13-3차)
-- **로깅 우선**: 추정 수정 대신 `console.error` 1줄 패치(13-2차)로 실제 스택부터 확보 → 원인 확정 후 진짜 수정. 삽질 방지 → libSQL RTT 누적/P2028 확정
-- **Raw SQL CASE WHEN 단일 UPDATE**: libSQL은 배치 트랜잭션에서 update를 직렬화해 RTT가 누적됨. `$transaction([...])` 대신 `$executeRaw`로 1 RTT. Prisma.sql/Prisma.join 파라미터 바인딩으로 SQL injection 안전
-- **raw SQL은 `@updatedAt` 훅 우회**: 수동으로 `updatedAt = now` 세팅 필요. 전송된 모든 row에 동일 타임스탬프 → 순서만 영향, 기능엔 안전
-- **Optimistic UI > 서버 왕복 대기**: React Query `onMutate` + `setQueryData` + `onError` 롤백 + `onSettled` invalidate. 체감 속도 즉시 개선
-- **Link 자동 prefetch는 dense list에서 과잉**: 칸반 카드 N개 = Vercel λ N번 호출. `prefetch={false}`로 클릭 시 navigate로 전환. 첫 클릭 1-2초 로딩은 허용
-- **`fetch(...).then`만으론 HTTP 에러를 surface 못함**: `r.ok` 체크 + `throw`가 있어야 React Query `onError`가 발동
-- **Vercel 자동 배포 미트리거** 대응: `vercel --prod --yes` 수동 배포가 표준 우회로. runbook에 기재됨
+### 댓글 대댓글 1-depth, 트리 들여쓰기, 상위 작성자 알림 (ADR-028)
+- depth 1단계 제한 — N-depth 재귀 UI는 모바일 인덴트 폭 문제. 대화 길어지면 새 댓글로 이어가는 것이 건강
+- 조회 API는 **flat 응답 유지**, 클라에서 `parentId`로 그룹핑. 서버 include 변경 최소
+- Turso 마이그: `ALTER TABLE ... ADD COLUMN parentId TEXT` + `CREATE INDEX` (SQLite ALTER는 REFERENCES 미지원이라 애플리케이션 레벨 FK로)
+- 알림: `ISSUE_COMMENTED` 타입 유지, title만 "새 답글"로 구분
+
+### 그 외
+- **Optimistic UI > 서버 왕복 대기**: `onMutate` + `setQueryData` + `onError` 롤백 + `onSettled` invalidate 패턴
+- **Dense list에는 `prefetch={false}`**: 칸반 카드 100개 × Next.js 자동 viewport prefetch = Vercel λ 100회 호출. 첫 클릭 1-2초 로딩 허용 대가로 비용 회수
+- **`useDroppable` vs `useSortable`**: SortableContext 밖 컬럼에는 `useDroppable`이 맞음. `arrayMove` 유틸로 재정렬 (splice 두 번 꼬임 제거)
+- **Tiptap RichEditor를 뷰어 모드로 재사용**: `dangerouslySetInnerHTML` 없이 ProseMirror schema 기반 렌더라 XSS 안전
+- **아바타 해시 색상**: 이름 공유(동명이인) 시 이름 기반 해시로는 구분 불가. 향후 id 기반 seed로 확장 여지. 금회는 이름 자체 정정으로 해결
 
 ## Known Issues
 
 ### 기존 이슈 (유지)
 
-- **이슈 상세 편집 모드는 여전히 `<textarea>` 사용** — new 경로(RichEditor)와 불일치. HTML 원본을 raw로 편집하는 상태. 상세 편집도 RichEditor로 전환 필요 (13-5차 후속)
-- **모바일 댓글 들여쓰기 `ml-10` 과다** — 좁은 화면에서 답글 영역이 압박받을 수 있음. `ml-6 md:ml-10` 조정 여지
-- **다른 페이지의 아바타도 `UserAvatar`로 교체 필요** — 13-7차에 컴포넌트 도입. 사이드바/헤더/notification-dropdown 등 다른 위치도 일괄 적용 여지
-- **댓글도 RichEditor 미적용** — 현재 plain textarea. 설명은 RichEditor인데 댓글은 불일치
+- **이슈 상세 편집 모드는 여전히 `<textarea>` 사용** — new 경로(RichEditor)와 불일치. HTML 원본 raw 편집
+- **모바일 댓글 들여쓰기 `ml-10` 과다** — 좁은 화면에서 답글 영역 압박. `ml-6 md:ml-10` 조정 여지
+- **다른 페이지 아바타 `UserAvatar` 미적용** — 사이드바/헤더/notification-dropdown 등 일괄 교체 여지
 - **탭 터치 타겟 `py-2` 미적용** — 접근성 전용 커밋에서 일괄 처리
 - **ARIA tablist/radiogroup 완전 구현 미실시** — roving tabindex + 화살표 키
 - **저장된 필터 팝오버 외부 클릭 닫힘 미구현**
-- **DnD 훅 비가시 트리 마운트**: `hidden md:block` 안에서도 `useSortable` 실행. 현재 규모 무영향
+- **DnD 훅 비가시 트리 마운트**: `hidden md:block` 안에서도 `useSortable` 실행. 현 규모 무영향
 - **모바일 칸반 카드 순서 조정 미지원** (ADR-026 후속)
-- **`boardMutation.onError` 토스트 UI 없음** — 13-3차에 `r.ok` 체크로 에러는 surface되지만 실제 토스트/인라인 메시지는 아직 미구현
-- **상태 select optimistic UI 없음** (모바일 `<select>` 경로. 데스크톱 DnD는 13-3차에 적용됨)
+- **`boardMutation.onError` 토스트 UI 없음** — `r.ok` 체크로 surface 되지만 토스트/인라인 메시지 미구현
+- **모바일 상태 select optimistic UI 없음** (데스크톱 DnD는 13-3차 해결)
 - **`label.color` hex 무검증 `style` 인라인** / **`JSON.parse(f.filters)` try-catch 누락**
-- **이슈 상세 `data!.issue.id` non-null** / **`commentMutation`의 `data?.issue?.id`** → `issue.id` 직접 사용 권장
+- **이슈 상세 `data!.issue.id` non-null** / **`commentMutation`의 `data?.issue?.id`**
 - **deployments fetch `r.ok` 체크 누락** / **`environment` 타입 `string`** (`DeployEnvironment` 아님)
 - **`window.confirm()` 사용** — iOS WKWebView 차단 가능
 - **BurndownChart 모바일 텍스트 가독성** — viewBox 축소 시 ≈6px
 - **e2e 선택자 견고성** — `data-testid` 부여 권장
 - **기존**: Outbox inline drain fire-and-forget, 첨부 Vercel 함수 경유, Prisma CLI `libsql://` 미지원, JWT role DB 미동기, 프로젝트 멤버십 미검증, 관리자용 사용자 매핑 화면 없음, push 이벤트 rate limit 없음
-- **Vercel ↔ GitHub 자동 배포 미트리거**: 이번 세션에서도 `git push`만으로 배포 안 되어 `vercel --prod --yes` 수동 실행. 연동 상태 점검 필요 (Vercel 대시보드 → Settings → Git)
+- **Vercel ↔ GitHub 자동 배포 미트리거** — 매번 `vercel --prod --yes` 수동 실행 필요
 - **기존 Stash**: `stash@{0}` WIP on `75e6aa5` — 무관
 
 ## Pending Improvements
 
-- [ ] **이슈 상세 편집 모드 RichEditor 전환** — 현재 textarea로 HTML raw 편집됨
-- [ ] **댓글 / 답글 입력도 RichEditor 적용** — 현재 plain textarea, 설명/에디터와 불일치
-- [ ] **다른 페이지 아바타 UserAvatar 교체** — 사이드바/헤더/기타 페이지로 확장
-- [ ] **Vercel ↔ GitHub 자동 배포 재연동** — 매번 수동 배포는 지속 불가능
-- [ ] **접근성 전용 커밋 (누적)** — 탭 터치 타겟 `py-2` + ARIA tablist 완전 + 팝오버 외부 클릭
-- [ ] **`boardMutation` 에러 토스트 UI** — `r.ok` 체크로 surface는 됐으나 사용자 피드백 UI 미구현
+- [ ] **이슈 상세 편집 모드 RichEditor 전환** — 현재 textarea로 HTML raw 편집
+- [ ] **댓글/답글 입력도 RichEditor 적용** — 설명과 일관성
+- [ ] **다른 페이지 아바타 `UserAvatar` 교체** — 사이드바/헤더/기타 페이지 확장
+- [ ] **Vercel ↔ GitHub 자동 배포 재연동**
+- [ ] **접근성 전용 커밋 (누적)** — 탭 `py-2` + ARIA tablist 완전 + 팝오버 외부 클릭
+- [ ] **`boardMutation` 에러 토스트 UI** — surface는 됐으나 사용자 피드백 UI 미구현
+- [ ] **모바일 답글 들여쓰기 조정** (`ml-6 md:ml-10`)
 - [ ] Rate limiting (알림/첨부/webhook) — Upstash Redis
 - [ ] Slack/Discord 외부 알림 통합 — Outbox 확장
 - [ ] 설정 페이지 2차 — name 편집, 삭제 영역 분리, 관리자용 사용자 매핑 화면
@@ -153,29 +103,29 @@ aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 - [ ] `window.confirm()` 인라인 확인 UI 교체
 - [ ] BurndownChart 모바일 텍스트 가독성
 - [ ] 칸반 모바일 카드 순서 조정 (↑↓ or long-press)
-- [ ] 모바일 상태 select optimistic UI + 토스트 피드백 (데스크톱 DnD는 13-3차 해결)
 - [ ] e2e `data-testid` 부여
 - [x] ~~GitHub 연동 스토리~~
 - [x] ~~기술 부채 정리 묶음~~ (ADR-025)
 - [x] ~~모바일 반응형 9 Phase~~ (ADR-026)
-- [x] ~~칸반 드래그 500 진짜 수정~~ (13-3차, `8a1cc2b`: `$executeRaw` CASE WHEN)
-- [x] ~~칸반 보드 반응속도/비용 튜닝~~ (13-3차, `e47d976`: optimistic UI + r.ok + prefetch=false)
-- [x] ~~칸반 같은 컬럼 내 카드 순서 변경~~ (13-4차, `088e565`: useDroppable + arrayMove)
-- [x] ~~이슈 설명 에디터 가독성 + 상세 HTML 렌더~~ (13-5차, `ce3eaf4`: text-gray-900 + RichEditor 뷰어 모드)
-- [x] ~~댓글 대댓글 1-depth 구조~~ (13-6차, `60a2e40`: parentId 스키마 + 트리 UI + 상위 작성자 알림)
-- [x] ~~이슈 상세 아바타 구분 + 페이지 가독성~~ (13-7차, 금회: UserAvatar + 색상 상향)
+- [x] ~~칸반 드래그 500 진짜 수정~~ (`8a1cc2b`, ADR-027)
+- [x] ~~칸반 보드 반응속도/비용 튜닝~~ (`e47d976`)
+- [x] ~~칸반 같은 컬럼 내 카드 순서 변경~~ (`088e565`)
+- [x] ~~이슈 설명 에디터 가독성 + 상세 HTML 렌더~~ (`ce3eaf4`)
+- [x] ~~댓글 대댓글 1-depth 구조~~ (`60a2e40`, ADR-028)
+- [x] ~~이슈 상세 아바타 구분 + 페이지 가독성~~ (`5dc4c98`)
+- [x] ~~seed/테스트 안내 "Ted" 하드코딩 정리~~ (`21e764f`)
 
 ## Context for Next Session
 
-- **다음 세션 후보**: (a) 접근성 전용 커밋 / (b) Vercel ↔ GitHub 자동 배포 재연동 / (c) `boardMutation` 에러 토스트 UI / (d) Rate limiting / (e) Slack 외부 알림 / (f) 설정 페이지 2차
-- 사용자(Ted) 선호: /ted-run 파이프라인(구현 → 리뷰 → 빌드 → HANDOFF/커밋). 푸시·프로덕션 배포는 명시 요청 시. 커밋 메시지 한글
-- **푸시 상태**: 금회 커밋까지 `origin/main` 반영 완료
+- **사용자 원본 의도**: 13-2차에 남긴 "칸반 드래그 500" 진단 로그를 뽑고 근본 해결 → 이어지는 UX 개선(반응속도/비용/순서 변경) → 에디터/상세 화면 정비 → 댓글 대댓글 구조 → 아바타/가독성 → seed 이름 정정까지 일괄 마무리
+- **다음 세션 후보**: (a) 접근성 전용 커밋 / (b) Vercel ↔ GitHub 자동 배포 재연동 / (c) `boardMutation` 에러 토스트 UI / (d) 댓글/답글 RichEditor 적용 / (e) 이슈 상세 편집 모드 RichEditor / (f) Rate limiting / (g) Slack 외부 알림 / (h) 설정 페이지 2차
+- 사용자(Ted=허우용) 선호: /ted-run 파이프라인(구현 → 리뷰 → 빌드 → HANDOFF/커밋). 푸시·프로덕션 배포는 명시 요청 시. 커밋 메시지 한글. **Turso 스키마 변경 같은 비가역 작업은 승인 요청 후 실행**
+- **푸시 상태**: 모든 커밋 `origin/main` 반영 완료
 - **Co-Authored-By**: 프로젝트 `.claude/settings.local.json`에서 `includeCoAuthoredBy: true`
 - Production URL: https://devtracker-dusky.vercel.app
-- 최신 배포: 금회 재배포 (직전: `dpl_JANrLuG8cTNQULt6qofDGmv9PvEj`)
 - Turso DB: `libsql://devtracker-withwooyong.aws-ap-northeast-1.turso.io`
 - GitHub: `withwooyong/devtracker`
-- ADMIN: `withwooyong@yanadoocorp.com` / `yanadoo123`
+- ADMIN: `withwooyong@yanadoocorp.com` / `yanadoo123` (name: 허우용)
 - 작업계획서: `docs/plan/mobile-responsive-plan.md`(9 Phase 완료)
 - Obsidian 심볼릭 링크: `Obsidian Vault/Ted/devtracker` → `devtracker/docs/`
 
@@ -189,7 +139,8 @@ aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 
 ## Runbook
 
-- **스키마 변경**: `npx prisma db push --url "file:./prisma/dev.db"` → `turso db shell devtracker "<SQL>"` → `npx prisma generate`
+- **스키마 변경**: 1) Turso에 `ALTER TABLE ...` 수기 실행(FK 절은 SQLite ALTER 미지원, nullable 컬럼 + 인덱스 분리) 2) `schema.prisma` 수정 3) `npx prisma db push --url "file:./prisma/dev.db"` 4) `npx prisma generate`
+- **Turso 쿼리**: `turso db shell devtracker "<SQL>"` (ADMIN은 homebrew `turso` CLI 로컬 설치)
 - **로컬 env 동기화**: `vercel env pull .env.local --yes`
 - **E2E 전체**: `pnpm dev &` 후 `npx playwright test` (양쪽 프로젝트 chromium + mobile-chrome)
 - **E2E 모바일만**: `npx playwright test --project=mobile-chrome`
@@ -205,3 +156,23 @@ aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 - **Outbox 수동 드레인**: `curl -H "Authorization: Bearer $CRON_SECRET" https://devtracker-dusky.vercel.app/api/cron/notifications/drain`
 - **Claude Code 개인 설정**: `.claude/settings.local.json`(gitignored)
 - **모바일 수동 확인**: iPhone SE 375×667 / Galaxy 360×780 / iPad 768 / 데스크톱 1440
+
+## Files Modified This Session
+
+```
+ CHANGELOG.md                                       |  72 +++++++
+ HANDOFF.md                                         | (전면 개편)
+ docs/ADR.md                                        | ADR-027, ADR-028 추가
+ docs/user-guide.md                                 | 답글 섹션 추가
+ prisma/schema.prisma                               |  +9 Comment.parentId + self relation + @@index
+ prisma/seed.ts                                     |  "Ted" 9곳 → "허우용"
+ src/app/api/projects/[projectId]/board/route.ts    |  $transaction → $executeRaw CASE WHEN
+ .../issues/[issueId]/comments/route.ts             |  parentId 검증 + 상위 작성자 알림
+ src/app/login/page.tsx                             |  테스트 계정 안내 "Ted" → "허우용"
+ src/app/projects/[projectKey]/board/page.tsx       |  optimistic + prefetch=false + useDroppable + arrayMove
+ .../issues/[issueNumber]/page.tsx                  |  RichEditor 뷰어 / 트리 댓글 / UserAvatar / 색상 상향
+ src/components/common/rich-editor.tsx              |  뷰어 모드 + 텍스트 색상
+ src/components/common/user-avatar.tsx              |  +67 신설
+ src/components/issues/issue-card.tsx               |  prefetch={false}
+ src/types/issue.ts                                 |  Comment.parentId
+```
