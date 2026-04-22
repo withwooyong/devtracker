@@ -38,7 +38,7 @@ export default function ProjectSettingsPage({
         <div className="flex items-center justify-between mb-6 gap-3">
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold text-gray-900 truncate">
-              {project?.name ?? projectKey} 설정
+              {project?.name ?? projectKey}
             </h1>
             <ProjectTabs projectKey={projectKey} />
           </div>

@@ -349,7 +349,7 @@ export default function BoardPage({
         <div className="flex items-center justify-between mb-6 gap-3">
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold text-gray-900 truncate">
-              {projectData?.project?.name ?? projectKey} - 칸반 보드
+              {projectData?.project?.name ?? projectKey}
             </h1>
             <ProjectTabs projectKey={projectKey} />
           </div>

@@ -99,27 +99,27 @@ export default function SprintListPage({
                         href={`/projects/${projectKey}/sprints/${sprint.id}`}
                         className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-sm transition"
                       >
-                        <div className="flex items-start justify-between">
-                          <h3 className="font-medium text-gray-900 truncate">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-medium text-gray-900 truncate min-w-0 flex-1">
                             {sprint.name}
                           </h3>
                           <span
-                            className={`text-xs px-2 py-0.5 rounded-full ${SPRINT_STATUS_COLORS[sprint.status]}`}
+                            className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${SPRINT_STATUS_COLORS[sprint.status]}`}
                           >
                             {SPRINT_STATUS_LABELS[sprint.status]}
                           </span>
                         </div>
                         {sprint.goal && (
-                          <p className="text-xs text-gray-500 mt-2 line-clamp-2">
+                          <p className="text-xs text-gray-500 mt-2 line-clamp-2 break-words">
                             {sprint.goal}
                           </p>
                         )}
-                        <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
-                          <span>
+                        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mt-3 text-xs text-gray-500">
+                          <span className="whitespace-nowrap">
                             {formatDate(sprint.startDate)} ~{" "}
                             {formatDate(sprint.endDate)}
                           </span>
-                          <span>이슈 {sprint._count?.issues ?? 0}</span>
+                          <span className="whitespace-nowrap">이슈 {sprint._count?.issues ?? 0}</span>
                         </div>
                       </Link>
                     ))}

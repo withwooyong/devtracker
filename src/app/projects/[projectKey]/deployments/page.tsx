@@ -42,7 +42,7 @@ export default function DeploymentsPage({
         <div className="flex items-center justify-between mb-6 gap-3">
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold text-gray-900 truncate">
-              {projectData?.project?.name ?? projectKey} - 배포 이력
+              {projectData?.project?.name ?? projectKey}
             </h1>
             <ProjectTabs projectKey={projectKey} />
           </div>
@@ -55,12 +55,12 @@ export default function DeploymentsPage({
         </div>
 
         {/* Env filter */}
-        <div className="mb-4 flex gap-2">
+        <div className="mb-4 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
           {(["ALL", "DEV", "STAGING", "PROD"] as const).map((env) => (
             <button
               key={env}
               onClick={() => setEnvFilter(env)}
-              className={`px-3 py-1.5 rounded-lg text-sm ${
+              className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap ${
                 envFilter === env
                   ? "bg-blue-600 text-white"
                   : "bg-white border text-gray-600 hover:bg-gray-50"
@@ -82,28 +82,28 @@ export default function DeploymentsPage({
                 key={dep.id}
                 className="bg-white p-4 rounded-lg border border-gray-200"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg font-semibold text-gray-900">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="text-lg font-semibold text-gray-900 break-words">
                       {dep.version}
                     </span>
                     <EnvBadge env={dep.environment} />
                     <DeployStatusBadge status={dep.status} />
                   </div>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 whitespace-nowrap shrink-0">
                     {new Date(dep.createdAt).toLocaleString("ko-KR")}
                   </span>
                 </div>
                 {dep.description && (
-                  <p className="text-sm text-gray-600 mb-2">
+                  <p className="text-sm text-gray-600 mb-2 break-words">
                     {dep.description}
                   </p>
                 )}
-                <div className="flex items-center gap-2 text-xs text-gray-500">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
                   <span>배포자: {dep.deployedBy?.name ?? "-"}</span>
                   {dep.deployedAt && (
                     <span>
-                      | 배포 시간:{" "}
+                      · 배포 시간:{" "}
                       {new Date(dep.deployedAt).toLocaleString("ko-KR")}
                     </span>
                   )}
