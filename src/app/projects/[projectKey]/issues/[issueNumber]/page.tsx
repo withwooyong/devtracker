@@ -151,9 +151,9 @@ export default function IssueDetailPage({
           &larr; 이슈 목록으로
         </Link>
 
-        <div className="grid grid-cols-3 gap-6">
+        <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Main content */}
-          <div className="col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 lg:space-y-6 min-w-0">
             {isEditing ? (
               <div className="bg-white p-4 rounded-lg border space-y-3">
                 <input
@@ -187,13 +187,13 @@ export default function IssueDetailPage({
                 </div>
               </div>
             ) : (
-              <div className="bg-white p-6 rounded-lg border">
-                <div className="flex items-start justify-between">
-                  <div>
+              <div className="bg-white p-4 sm:p-6 rounded-lg border">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
                     <span className="text-sm text-gray-500">
                       {projectKey}-{issue.issueNumber}
                     </span>
-                    <h1 className="text-xl font-bold text-gray-900 mt-1">
+                    <h1 className="text-xl font-bold text-gray-900 mt-1 break-words">
                       {issue.title}
                     </h1>
                   </div>
@@ -203,13 +203,13 @@ export default function IssueDetailPage({
                       setEditDesc(issue.description ?? "");
                       setIsEditing(true);
                     }}
-                    className="text-sm text-gray-500 hover:text-blue-600"
+                    className="text-sm text-gray-500 hover:text-blue-600 whitespace-nowrap"
                   >
                     편집
                   </button>
                 </div>
                 {issue.description && (
-                  <div className="mt-4 text-sm text-gray-700 whitespace-pre-wrap">
+                  <div className="mt-4 text-sm text-gray-700 whitespace-pre-wrap break-words">
                     {issue.description}
                   </div>
                 )}
@@ -230,7 +230,7 @@ export default function IssueDetailPage({
 
             {/* Tab switcher */}
             <div className="space-y-4">
-              <div className="flex gap-1 border-b border-gray-200">
+              <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
                 {(
                   [
                     { key: "comments", label: `댓글 (${issue.comments?.length ?? 0})` },
@@ -241,7 +241,7 @@ export default function IssueDetailPage({
                   <button
                     key={key}
                     onClick={() => setActiveTab(key)}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
                       activeTab === key
                         ? "border-blue-600 text-blue-600"
                         : "border-transparent text-gray-500 hover:text-gray-700"
@@ -266,7 +266,7 @@ export default function IssueDetailPage({
                           {new Date(c.createdAt).toLocaleString("ko-KR")}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
                         {c.content}
                       </p>
                     </div>
@@ -330,7 +330,7 @@ export default function IssueDetailPage({
                               {new Date(c.createdAt).toLocaleString("ko-KR")}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
                             {c.content}
                           </p>
                         </div>
