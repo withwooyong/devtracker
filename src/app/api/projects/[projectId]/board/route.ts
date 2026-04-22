@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { z } from "zod";
@@ -45,14 +46,26 @@ export async function PATCH(
       return NextResponse.json({ error: "유효하지 않은 이슈가 포함되어 있습니다." }, { status: 400 });
     }
 
-    await prisma.$transaction(
-      items.map((item) =>
-        prisma.issue.update({
-          where: { id: item.id },
-          data: { status: item.status, kanbanOrder: item.kanbanOrder },
-        })
-      )
-    );
+    if (items.length > 0) {
+      const statusCases = Prisma.join(
+        items.map((i) => Prisma.sql`WHEN ${i.id} THEN ${i.status}`),
+        " "
+      );
+      const orderCases = Prisma.join(
+        items.map((i) => Prisma.sql`WHEN ${i.id} THEN ${i.kanbanOrder}`),
+        " "
+      );
+      const ids = Prisma.join(items.map((i) => i.id));
+      const now = new Date().toISOString();
+
+      await prisma.$executeRaw`
+        UPDATE "Issue"
+        SET "status" = CASE "id" ${statusCases} END,
+            "kanbanOrder" = CASE "id" ${orderCases} END,
+            "updatedAt" = ${now}
+        WHERE "id" IN (${ids})
+      `;
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
