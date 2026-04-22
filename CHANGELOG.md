@@ -3,6 +3,20 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-22 후속] 칸반 드래그 500 진단용 로깅 (진행 중)
+
+### Added
+- `src/app/api/projects/[projectId]/board/route.ts` catch 블록에 `console.error("[board PATCH]", error)` 추가 — 프로덕션에서 드래그 시 500을 반환하지만 에러가 삼켜져 Vercel Function 로그에 원인이 안 찍히던 상황 대응 — `dcfdf33`
+
+### 진행 상태
+- 프로덕션(https://devtracker-dusky.vercel.app) 칸반 드래그 시 `PATCH /api/projects/DEV/board` → **500 Internal Server Error** 반복
+- 클라이언트 측 DnD는 정상: 커서 `grab`, 파란 테두리 `DragOverlay` 정상 표시
+- `dcfdf33` 커밋 + `dpl_HdTN32RKEdVFe7chHKBW4WPSYG33` 배포 완료. 사용자 재현 대기 중
+- 재현 후 `vercel logs --status-code=500 --expand`로 실제 에러 스택 포착 → 진짜 수정 예정
+- 예상 후보: Turso `$transaction([...updates])` 호환성 / Vercel Function 타임아웃 / 스키마 드리프트
+
+---
+
 ## [2026-04-22] 모바일 반응형 9 Phase — 전 페이지 375px 대응
 
 ### Added
