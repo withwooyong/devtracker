@@ -11,6 +11,7 @@ import {
   DragOverlay,
   closestCorners,
   PointerSensor,
+  useDroppable,
   useSensor,
   useSensors,
   type DragStartEvent,
@@ -18,6 +19,7 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
+  arrayMove,
   verticalListSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
@@ -150,10 +152,9 @@ function KanbanColumn({
   issues: Issue[];
   projectKey: string;
 }) {
-  const { setNodeRef } = useSortable({
+  const { setNodeRef } = useDroppable({
     id: column.id,
-    data: { type: "column" },
-    disabled: true,
+    data: { type: "column", columnId: column.id },
   });
 
   return (
@@ -322,6 +323,7 @@ export default function BoardPage({
 
     const activeId = active.id as string;
     const overId = over.id as string;
+    if (activeId === overId) return;
 
     const sourceCol = findColumnByIssueId(activeId);
     const targetCol =
@@ -330,50 +332,54 @@ export default function BoardPage({
 
     if (!sourceCol || !targetCol) return;
 
-    const sourceItems = [...issuesByStatus[sourceCol]];
-    const targetItems =
-      sourceCol === targetCol ? sourceItems : [...issuesByStatus[targetCol]];
-
-    const activeIdx = sourceItems.findIndex((i) => i.id === activeId);
-    if (activeIdx === -1) return;
-
-    const movedItem = { ...sourceItems[activeIdx], status: targetCol };
-    sourceItems.splice(activeIdx, 1);
-
     if (sourceCol === targetCol) {
-      const overIdx = sourceItems.findIndex((i) => i.id === overId);
-      if (overIdx !== -1) {
-        sourceItems.splice(overIdx, 0, movedItem);
-      } else {
-        sourceItems.push(movedItem);
-      }
-      const updates = sourceItems.map((item, idx) => ({
+      const items = issuesByStatus[sourceCol];
+      const oldIndex = items.findIndex((i) => i.id === activeId);
+      const newIndex = items.findIndex((i) => i.id === overId);
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+
+      const reordered = arrayMove(items, oldIndex, newIndex);
+      const updates = reordered.map((item, idx) => ({
         id: item.id,
-        status: targetCol,
+        status: sourceCol,
         kanbanOrder: idx,
       }));
       boardMutation.mutate(updates);
-    } else {
-      const overIdx = targetItems.findIndex((i) => i.id === overId);
-      if (overIdx !== -1) {
-        targetItems.splice(overIdx, 0, movedItem);
-      } else {
-        targetItems.push(movedItem);
-      }
-      const updates = [
-        ...sourceItems.map((item, idx) => ({
-          id: item.id,
-          status: sourceCol,
-          kanbanOrder: idx,
-        })),
-        ...targetItems.map((item, idx) => ({
-          id: item.id,
-          status: targetCol,
-          kanbanOrder: idx,
-        })),
-      ];
-      boardMutation.mutate(updates);
+      return;
     }
+
+    // Cross-column move
+    const sourceItems = issuesByStatus[sourceCol].filter(
+      (i) => i.id !== activeId
+    );
+    const activeIssueData = issuesByStatus[sourceCol].find(
+      (i) => i.id === activeId
+    );
+    if (!activeIssueData) return;
+    const movedItem = { ...activeIssueData, status: targetCol };
+
+    const targetItems = [...issuesByStatus[targetCol]];
+    const overIdx = targetItems.findIndex((i) => i.id === overId);
+    if (overIdx === -1) {
+      // Dropped onto column (empty area) — append to end
+      targetItems.push(movedItem);
+    } else {
+      targetItems.splice(overIdx, 0, movedItem);
+    }
+
+    const updates = [
+      ...sourceItems.map((item, idx) => ({
+        id: item.id,
+        status: sourceCol,
+        kanbanOrder: idx,
+      })),
+      ...targetItems.map((item, idx) => ({
+        id: item.id,
+        status: targetCol,
+        kanbanOrder: idx,
+      })),
+    ];
+    boardMutation.mutate(updates);
   }
 
   return (

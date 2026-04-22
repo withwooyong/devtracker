@@ -1,26 +1,33 @@
 # Session Handoff
 
-> Last updated: 2026-04-22 (KST, 13-3차 — 칸반 500 해결 + 성능 튜닝)
+> Last updated: 2026-04-22 (KST, 13-4차 — 칸반 같은 컬럼 순서 변경 수정)
 > Branch: `main`
-> Latest commit: 금회 커밋 — fix: 칸반 보드 반응속도/비용 튜닝 (optimistic UI + r.ok + prefetch=false)
+> Latest commit: 금회 커밋 — fix: 칸반 같은 컬럼 내 순서 변경 동작 (useDroppable + arrayMove)
 > Production: https://devtracker-dusky.vercel.app
-> 최신 배포: 금회 재배포 예정 (직전: `dpl_3DcYXFihm8BKBQ6CwnzDDXWRjPq6`)
+> 최신 배포: 금회 재배포 예정 (직전: `dpl_3yZNBaWUHc1ffcWkqrr64jNTxs7R`)
 
 ## Current Status
 
-**✅ 칸반 보드 드래그 500 해결 + 반응속도/비용 튜닝 완료**. 13-2차에서 남긴 로깅 패치(`dcfdf33`)로 `vercel logs`에서 원인 포착 → Prisma `$transaction([...N update])`이 libSQL(Turso) RTT 누적으로 **5초 인터랙티브 트랜잭션 타임아웃(P2028)** 초과. `prisma.$executeRaw` + `CASE WHEN` 단일 UPDATE(`8a1cc2b`)로 1 RTT로 압축 → 200 OK 확인. 추가로 (a) 드래그 후 반영 지연 → React Query **optimistic update + 롤백**, (b) `fetch`가 `r.ok` 미체크로 500을 삼키던 결함 수정, (c) 보드 카드 `<Link>` 자동 prefetch 과다(N개 카드 = N개 RSC 호출) → `prefetch={false}`로 전환. 금회 커밋 1건에 묶어 커밋·푸시·재배포 완료.
+**✅ 칸반 보드 드래그 500 해결 + 반응속도/비용 튜닝 + 같은 컬럼 순서 변경 수정 완료**. 13-2차에서 남긴 로깅 패치(`dcfdf33`)로 `vercel logs`에서 원인 포착 → Prisma `$transaction([...N update])`이 libSQL(Turso) RTT 누적으로 **5초 인터랙티브 트랜잭션 타임아웃(P2028)** 초과. `prisma.$executeRaw` + `CASE WHEN` 단일 UPDATE(`8a1cc2b`)로 1 RTT로 압축. 13-3차에서 optimistic UI + `r.ok` 체크 + `prefetch={false}`로 반응속도/비용 튜닝(`e47d976`). 13-4차(금회)에서 같은 컬럼 내 카드 순서 변경이 작동 안 하던 이슈 수정 — `KanbanColumn`에 `useSortable({ disabled: true })`를 잘못 사용한 것을 `useDroppable`로 교체하고, `handleDragEnd`의 splice 두 번 꼬임을 `@dnd-kit/sortable`의 `arrayMove` 유틸로 단순화. 제자리 드래그 early return도 추가.
 
-## Completed This Session (2026-04-22, 13-3차)
+## Completed This Session (2026-04-22, 13-4차)
+
+| # | Task | 커밋 |
+|---|------|------|
+| 1 | 사용자 제보: "각 카드 영역별 순서를 변경할 수가 없다" — 같은 컬럼 내 순서 변경 불가 | — |
+| 2 | 원인 확정: (a) `KanbanColumn`에 `useSortable({ disabled: true })` 오용 (SortableContext 밖 column엔 `useDroppable`이 맞음), (b) `handleDragEnd` same-column 분기의 splice 두 번 방식이 인덱스 꼬여 맨 뒤로 `push`되는 경계 케이스 존재 | — |
+| 3 | `board/page.tsx` — `KanbanColumn` `useSortable` → `useDroppable` 교체 | 금회 |
+| 4 | `handleDragEnd` — same-column 분기를 `@dnd-kit/sortable`의 `arrayMove` 유틸로 재작성, `activeId === overId` / `oldIndex === newIndex` early return 추가, cross-column 분기도 immutable 스타일로 정리 | 금회 |
+| 5 | HANDOFF.md 업데이트, 커밋·푸시·재배포 | 금회 |
+
+### 직전 세션 (13-3차)
 
 | # | Task | 커밋 |
 |---|------|------|
 | 1 | `vercel logs ... --status-code=500 --expand`로 실제 스택 확보. 원인: `Transaction API error: A rollback cannot be executed on an expired transaction. timeout 5000ms, timeTaken 5201~5952ms` (Prisma P2028) | — |
 | 2 | `board/route.ts` — `$transaction([...update])` 배치 → `prisma.$executeRaw` + `CASE WHEN` 단일 UPDATE. `Prisma.sql`/`Prisma.join` 파라미터 바인딩으로 SQL injection 안전. `updatedAt` 명시 세팅 | `8a1cc2b` |
-| 3 | 프로덕션 재배포(`dpl_3DcYXFihm8BKBQ6CwnzDDXWRjPq6`) 후 PATCH 200 OK 로그 확인 | — |
-| 4 | 사용자 제보: "이동은 하는데 굉장히 느리게 반영" + 보드 진입 시 카드별 `_rsc=` prefetch 다수 발생 | — |
-| 5 | `board/page.tsx` `boardMutation` — optimistic update(`onMutate` 스냅샷 + `queryClient.setQueryData`) + `onError` 롤백 + `onSettled` invalidate. `mutationFn`에 `res.ok` 체크 + throw로 에러 surface | 금회 |
-| 6 | `IssueCard` + 보드 내 데스크톱/모바일 칸반 카드 `<Link>` 3곳에 `prefetch={false}` — Next.js App Router 자동 viewport prefetch로 카드 수만큼 Vercel λ 호출되던 문제 해소 | 금회 |
-| 7 | HANDOFF.md 업데이트, 커밋·푸시·재배포 | 금회 |
+| 3 | `board/page.tsx` `boardMutation` — optimistic update + onError 롤백 + onSettled invalidate. `mutationFn`에 `res.ok` 체크 + throw | `e47d976` |
+| 4 | `IssueCard` + 보드 카드 `<Link>` 3곳에 `prefetch={false}` | `e47d976` |
 
 ### 직전 세션 (13-2차, 같은 날)
 
@@ -48,7 +55,8 @@
 ## Recent Commits
 
 ```
-금회     fix: 칸반 보드 반응속도/비용 튜닝 (optimistic UI + r.ok + prefetch=false)
+금회     fix: 칸반 같은 컬럼 내 순서 변경 동작 (useDroppable + arrayMove)
+e47d976  fix: 칸반 보드 반응속도/비용 튜닝 (optimistic UI + r.ok + prefetch=false)
 8a1cc2b  fix: 칸반 보드 PATCH Prisma 트랜잭션 타임아웃 해소 (Raw SQL CASE WHEN)
 dcfdf33  debug: board PATCH catch 블록에 console.error 추가
 955a696  /handoff: 모바일 반응형 9 Phase CHANGELOG/HANDOFF + e2e 가이드 73개
@@ -122,7 +130,8 @@ aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 - [x] ~~기술 부채 정리 묶음~~ (ADR-025)
 - [x] ~~모바일 반응형 9 Phase~~ (ADR-026)
 - [x] ~~칸반 드래그 500 진짜 수정~~ (13-3차, `8a1cc2b`: `$executeRaw` CASE WHEN)
-- [x] ~~칸반 보드 반응속도/비용 튜닝~~ (13-3차, 금회: optimistic UI + r.ok + prefetch=false)
+- [x] ~~칸반 보드 반응속도/비용 튜닝~~ (13-3차, `e47d976`: optimistic UI + r.ok + prefetch=false)
+- [x] ~~칸반 같은 컬럼 내 카드 순서 변경~~ (13-4차, 금회: useDroppable + arrayMove)
 
 ## Context for Next Session
 
@@ -131,7 +140,7 @@ aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 - **푸시 상태**: 금회 커밋까지 `origin/main` 반영 완료
 - **Co-Authored-By**: 프로젝트 `.claude/settings.local.json`에서 `includeCoAuthoredBy: true`
 - Production URL: https://devtracker-dusky.vercel.app
-- 최신 배포: 금회 재배포 (직전: `dpl_3DcYXFihm8BKBQ6CwnzDDXWRjPq6`)
+- 최신 배포: 금회 재배포 (직전: `dpl_3yZNBaWUHc1ffcWkqrr64jNTxs7R`)
 - Turso DB: `libsql://devtracker-withwooyong.aws-ap-northeast-1.turso.io`
 - GitHub: `withwooyong/devtracker`
 - ADMIN: `withwooyong@yanadoocorp.com` / `yanadoo123`
