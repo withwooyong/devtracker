@@ -1,26 +1,31 @@
 # Session Handoff
 
-> Last updated: 2026-04-22 (KST, 13-6차 — 댓글 대댓글 1-depth 구조)
+> Last updated: 2026-04-22 (KST, 13-7차 — UserAvatar 컴포넌트 + 이슈 상세 가독성)
 > Branch: `main`
-> Latest commit: 금회 커밋 — feat: 댓글 대댓글 1-depth 구조 (스키마 + API + 트리 UI + 알림)
+> Latest commit: 금회 커밋 — feat: UserAvatar + 이슈 상세 페이지 가독성 개선
 > Production: https://devtracker-dusky.vercel.app
-> 최신 배포: 금회 재배포 예정 (직전: `dpl_2Hi4AMX23Ya5Z8c9rX8BVkBN8k9N`)
+> 최신 배포: 금회 재배포 예정 (직전: `dpl_JANrLuG8cTNQULt6qofDGmv9PvEj`)
 
 ## Current Status
 
 **✅ 칸반 보드 드래그 500 해결 + 반응속도/비용 튜닝 + 같은 컬럼 순서 변경 수정 완료**. 13-2차에서 남긴 로깅 패치(`dcfdf33`)로 `vercel logs`에서 원인 포착 → Prisma `$transaction([...N update])`이 libSQL(Turso) RTT 누적으로 **5초 인터랙티브 트랜잭션 타임아웃(P2028)** 초과. `prisma.$executeRaw` + `CASE WHEN` 단일 UPDATE(`8a1cc2b`)로 1 RTT로 압축. 13-3차에서 optimistic UI + `r.ok` 체크 + `prefetch={false}`로 반응속도/비용 튜닝(`e47d976`). 13-4차(금회)에서 같은 컬럼 내 카드 순서 변경이 작동 안 하던 이슈 수정 — `KanbanColumn`에 `useSortable({ disabled: true })`를 잘못 사용한 것을 `useDroppable`로 교체하고, `handleDragEnd`의 splice 두 번 꼬임을 `@dnd-kit/sortable`의 `arrayMove` 유틸로 단순화. 제자리 드래그 early return도 추가.
 
-## Completed This Session (2026-04-22, 13-6차)
+## Completed This Session (2026-04-22, 13-7차)
 
 | # | Task | 커밋 |
 |---|------|------|
-| 1 | 대댓글 스펙 확정: 1-depth / 트리 들여쓰기 / 상위 작성자 알림 발송 | — |
-| 2 | Turso 마이그레이션: `ALTER TABLE "Comment" ADD COLUMN "parentId" TEXT` + `CREATE INDEX "Comment_parentId_idx"`. SQLite ALTER는 FK 절 미지원이라 컬럼만 추가, FK 관계는 Prisma schema 선언으로 애플리케이션 레벨 참조 | — |
-| 3 | `prisma/schema.prisma` Comment에 `parentId String?` + `parent Comment?` self relation + `replies Comment[]` + `@@index([parentId])`. 로컬 `prisma db push` + `prisma generate` 완료 | 금회 |
-| 4 | `types/issue.ts` Comment에 `parentId?: string \| null` 추가 | 금회 |
-| 5 | `comments/route.ts` POST: `parentId` 옵션 수신 + parent 존재/같은 이슈 검증 + 1-depth 제한(`parent.parentId !== null`이면 400). 알림 `recipients`에 parent 작성자 추가(본인 제외), title을 "새 답글"로 구분 | 금회 |
-| 6 | `issues/[issueNumber]/page.tsx`: `replyingTo`/`replyContent` state 추가. 댓글 탭에서 `comments`를 parentId로 그룹화 → 루트 댓글 아래 `ml-10`으로 들여쓴 답글 렌더 + "답글" 토글 버튼 + 답글 폼. 답글에는 "답글" 버튼 없음(1-depth 제한) | 금회 |
-| 7 | HANDOFF.md 업데이트, 커밋·푸시·재배포 | 금회 |
+| 1 | 사용자 제보: (a) 아바타 이니셜이 모두 'T'로 동일해 구분 불가(이름 첫글자 공유 + `bg-blue-500` 고정), (b) 이슈 상세 페이지 전반 색상이 흐려 가독성 나쁨 | — |
+| 2 | `components/common/user-avatar.tsx` 신설: `avatarUrl` 있으면 `<img>`, 없으면 이름 해시 기반 16색 팔레트에서 색상 선택 + 이니셜. `size: "xs" | "sm" | "md"` 3단계 | 금회 |
+| 3 | 이슈 상세 아바타 3곳(댓글/답글/전체 탭)을 `<UserAvatar />`로 교체 — 이름이 달라지면 색상이 달라져 구분 가능 | 금회 |
+| 4 | 이슈 상세 색상 일괄 상향: 라벨 gray-500→600, 값/이름 gray-700→900, 시간 gray-400→500, 비활성 탭 gray-500/700→600/900, 뒤로가기/편집 버튼 gray-500→600 | 금회 |
+| 5 | 전체 탭 답글 구분 배지 추가(기존 Known Issue 해소): `c.parentId ? "답글" : "댓글"` | 금회 |
+| 6 | HANDOFF.md 업데이트, 커밋·푸시·재배포 | 금회 |
+
+### 직전 세션 (13-6차)
+
+| # | Task | 커밋 |
+|---|------|------|
+| 1 | 댓글 대댓글 1-depth 구조 (Turso ALTER TABLE + Prisma schema + API + 트리 UI + 알림 상위 작성자 추가) | `60a2e40` |
 
 ### 직전 세션 (13-5차)
 
@@ -70,11 +75,11 @@
 ## Recent Commits
 
 ```
-금회     feat: 댓글 대댓글 1-depth 구조 (스키마 + API + 트리 UI + 알림)
+금회     feat: UserAvatar + 이슈 상세 페이지 가독성 개선
+60a2e40  feat: 댓글 대댓글 1-depth 구조 (스키마 + API + 트리 UI + 알림)
 ce3eaf4  fix: 이슈 설명 에디터 가독성 + 상세 뷰 RichEditor 재사용
 088e565  fix: 칸반 같은 컬럼 내 순서 변경 동작 (useDroppable + arrayMove)
 e47d976  fix: 칸반 보드 반응속도/비용 튜닝 (optimistic UI + r.ok + prefetch=false)
-8a1cc2b  fix: 칸반 보드 PATCH Prisma 트랜잭션 타임아웃 해소 (Raw SQL CASE WHEN)
 dcfdf33  debug: board PATCH catch 블록에 console.error 추가
 955a696  /handoff: 모바일 반응형 9 Phase CHANGELOG/HANDOFF + e2e 가이드 73개
 7ed3bdf  모바일 반응형 Phase 9: Playwright 모바일 프로젝트 + 스모크 스펙 4종
@@ -107,8 +112,8 @@ aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 ### 기존 이슈 (유지)
 
 - **이슈 상세 편집 모드는 여전히 `<textarea>` 사용** — new 경로(RichEditor)와 불일치. HTML 원본을 raw로 편집하는 상태. 상세 편집도 RichEditor로 전환 필요 (13-5차 후속)
-- **"전체" 탭에서 답글 구분 미표시** — 댓글과 답글이 flat으로 섞여 표시. 답글 배지/prefix 추가 여지 (13-6차 후속)
 - **모바일 댓글 들여쓰기 `ml-10` 과다** — 좁은 화면에서 답글 영역이 압박받을 수 있음. `ml-6 md:ml-10` 조정 여지
+- **다른 페이지의 아바타도 `UserAvatar`로 교체 필요** — 13-7차에 컴포넌트 도입. 사이드바/헤더/notification-dropdown 등 다른 위치도 일괄 적용 여지
 - **댓글도 RichEditor 미적용** — 현재 plain textarea. 설명은 RichEditor인데 댓글은 불일치
 - **탭 터치 타겟 `py-2` 미적용** — 접근성 전용 커밋에서 일괄 처리
 - **ARIA tablist/radiogroup 완전 구현 미실시** — roving tabindex + 화살표 키
@@ -131,7 +136,7 @@ aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 
 - [ ] **이슈 상세 편집 모드 RichEditor 전환** — 현재 textarea로 HTML raw 편집됨
 - [ ] **댓글 / 답글 입력도 RichEditor 적용** — 현재 plain textarea, 설명/에디터와 불일치
-- [ ] **"전체" 탭 답글 구분 표시** — 답글 배지 or `└` prefix
+- [ ] **다른 페이지 아바타 UserAvatar 교체** — 사이드바/헤더/기타 페이지로 확장
 - [ ] **Vercel ↔ GitHub 자동 배포 재연동** — 매번 수동 배포는 지속 불가능
 - [ ] **접근성 전용 커밋 (누적)** — 탭 터치 타겟 `py-2` + ARIA tablist 완전 + 팝오버 외부 클릭
 - [ ] **`boardMutation` 에러 토스트 UI** — `r.ok` 체크로 surface는 됐으나 사용자 피드백 UI 미구현
@@ -157,7 +162,8 @@ aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 - [x] ~~칸반 보드 반응속도/비용 튜닝~~ (13-3차, `e47d976`: optimistic UI + r.ok + prefetch=false)
 - [x] ~~칸반 같은 컬럼 내 카드 순서 변경~~ (13-4차, `088e565`: useDroppable + arrayMove)
 - [x] ~~이슈 설명 에디터 가독성 + 상세 HTML 렌더~~ (13-5차, `ce3eaf4`: text-gray-900 + RichEditor 뷰어 모드)
-- [x] ~~댓글 대댓글 1-depth 구조~~ (13-6차, 금회: parentId 스키마 + 트리 UI + 상위 작성자 알림)
+- [x] ~~댓글 대댓글 1-depth 구조~~ (13-6차, `60a2e40`: parentId 스키마 + 트리 UI + 상위 작성자 알림)
+- [x] ~~이슈 상세 아바타 구분 + 페이지 가독성~~ (13-7차, 금회: UserAvatar + 색상 상향)
 
 ## Context for Next Session
 
@@ -166,7 +172,7 @@ aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 - **푸시 상태**: 금회 커밋까지 `origin/main` 반영 완료
 - **Co-Authored-By**: 프로젝트 `.claude/settings.local.json`에서 `includeCoAuthoredBy: true`
 - Production URL: https://devtracker-dusky.vercel.app
-- 최신 배포: 금회 재배포 (직전: `dpl_2Hi4AMX23Ya5Z8c9rX8BVkBN8k9N`)
+- 최신 배포: 금회 재배포 (직전: `dpl_JANrLuG8cTNQULt6qofDGmv9PvEj`)
 - Turso DB: `libsql://devtracker-withwooyong.aws-ap-northeast-1.turso.io`
 - GitHub: `withwooyong/devtracker`
 - ADMIN: `withwooyong@yanadoocorp.com` / `yanadoo123`

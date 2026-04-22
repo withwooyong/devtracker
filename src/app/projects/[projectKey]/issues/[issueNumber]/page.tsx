@@ -7,6 +7,7 @@ import { ActivityTimeline } from "@/components/common/activity-timeline";
 import { AttachmentList } from "@/components/common/attachment-list";
 import { GitHubLinkList } from "@/components/common/github-link-list";
 import { RichEditor } from "@/components/common/rich-editor";
+import { UserAvatar } from "@/components/common/user-avatar";
 import Link from "next/link";
 import type { Issue } from "@/types/issue";
 import type { User } from "@/types/user";
@@ -154,7 +155,7 @@ export default function IssueDetailPage({
       <div className="max-w-4xl mx-auto">
         <Link
           href={`/projects/${projectKey}`}
-          className="text-sm text-gray-500 hover:text-gray-700 mb-4 inline-block"
+          className="text-sm text-gray-600 hover:text-gray-900 mb-4 inline-block"
         >
           &larr; 이슈 목록으로
         </Link>
@@ -198,7 +199,7 @@ export default function IssueDetailPage({
               <div className="bg-white p-4 sm:p-6 rounded-lg border">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-gray-600">
                       {projectKey}-{issue.issueNumber}
                     </span>
                     <h1 className="text-xl font-bold text-gray-900 mt-1 break-words">
@@ -211,7 +212,7 @@ export default function IssueDetailPage({
                       setEditDesc(issue.description ?? "");
                       setIsEditing(true);
                     }}
-                    className="text-sm text-gray-500 hover:text-blue-600 whitespace-nowrap"
+                    className="text-sm text-gray-600 hover:text-blue-600 whitespace-nowrap"
                   >
                     편집
                   </button>
@@ -255,7 +256,7 @@ export default function IssueDetailPage({
                     className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
                       activeTab === key
                         ? "border-blue-600 text-blue-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
+                        : "border-transparent text-gray-600 hover:text-gray-900"
                     }`}
                   >
                     {label}
@@ -283,17 +284,19 @@ export default function IssueDetailPage({
                         <div key={c.id} className="space-y-2">
                           <div className="bg-white p-4 rounded-lg border">
                             <div className="flex items-center gap-2 mb-2">
-                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-medium">
-                                {c.author.name.charAt(0)}
-                              </div>
-                              <span className="text-sm font-medium">
+                              <UserAvatar
+                                name={c.author.name}
+                                avatarUrl={c.author.avatarUrl}
+                                size="sm"
+                              />
+                              <span className="text-sm font-medium text-gray-900">
                                 {c.author.name}
                               </span>
-                              <span className="text-xs text-gray-400">
+                              <span className="text-xs text-gray-500">
                                 {new Date(c.createdAt).toLocaleString("ko-KR")}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                            <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
                               {c.content}
                             </p>
                             <div className="mt-2">
@@ -304,7 +307,7 @@ export default function IssueDetailPage({
                                     replyingTo === c.id ? null : c.id
                                   )
                                 }
-                                className="text-xs text-gray-500 hover:text-blue-600"
+                                className="text-xs text-gray-600 hover:text-blue-600"
                               >
                                 {replyingTo === c.id ? "답글 취소" : "답글"}
                               </button>
@@ -319,19 +322,21 @@ export default function IssueDetailPage({
                                   className="bg-gray-50 p-3 rounded-lg border"
                                 >
                                   <div className="flex items-center gap-2 mb-2">
-                                    <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-[10px] text-white font-medium">
-                                      {r.author.name.charAt(0)}
-                                    </div>
-                                    <span className="text-sm font-medium">
+                                    <UserAvatar
+                                      name={r.author.name}
+                                      avatarUrl={r.author.avatarUrl}
+                                      size="xs"
+                                    />
+                                    <span className="text-sm font-medium text-gray-900">
                                       {r.author.name}
                                     </span>
-                                    <span className="text-xs text-gray-400">
+                                    <span className="text-xs text-gray-500">
                                       {new Date(r.createdAt).toLocaleString(
                                         "ko-KR"
                                       )}
                                     </span>
                                   </div>
-                                  <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                                  <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
                                     {r.content}
                                   </p>
                                 </div>
@@ -429,7 +434,7 @@ export default function IssueDetailPage({
               {activeTab === "all" && (
                 <div className="space-y-3">
                   {allItems.length === 0 && (
-                    <div className="text-center py-8 text-sm text-gray-400">
+                    <div className="text-center py-8 text-sm text-gray-500">
                       내역이 없습니다.
                     </div>
                   )}
@@ -439,16 +444,20 @@ export default function IssueDetailPage({
                       return (
                         <div key={`comment-${c.id}`} className="bg-white p-4 rounded-lg border">
                           <div className="flex items-center gap-2 mb-2">
-                            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-medium">
-                              {c.author.name.charAt(0)}
-                            </div>
-                            <span className="text-sm font-medium">{c.author.name}</span>
-                            <span className="text-xs text-gray-400">댓글</span>
-                            <span className="text-xs text-gray-400">
+                            <UserAvatar
+                              name={c.author.name}
+                              avatarUrl={c.author.avatarUrl}
+                              size="sm"
+                            />
+                            <span className="text-sm font-medium text-gray-900">{c.author.name}</span>
+                            <span className="text-xs text-gray-500">
+                              {c.parentId ? "답글" : "댓글"}
+                            </span>
+                            <span className="text-xs text-gray-500">
                               {new Date(c.createdAt).toLocaleString("ko-KR")}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                          <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
                             {c.content}
                           </p>
                         </div>
@@ -471,7 +480,7 @@ export default function IssueDetailPage({
           <div className="space-y-4">
             <div className="bg-white p-4 rounded-lg border space-y-3">
               <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
                   상태
                 </label>
                 <select
@@ -489,7 +498,7 @@ export default function IssueDetailPage({
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
                   우선순위
                 </label>
                 <select
@@ -507,7 +516,7 @@ export default function IssueDetailPage({
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
                   담당자
                 </label>
                 <select
@@ -528,27 +537,27 @@ export default function IssueDetailPage({
                 </select>
               </div>
 
-              <div className="pt-2 border-t space-y-2 text-xs text-gray-500">
+              <div className="pt-2 border-t space-y-2 text-xs text-gray-600">
                 <div className="flex justify-between">
                   <span>보고자</span>
-                  <span className="text-gray-700">{issue.reporter?.name}</span>
+                  <span className="text-gray-900">{issue.reporter?.name}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>생성일</span>
-                  <span className="text-gray-700">
+                  <span className="text-gray-900">
                     {new Date(issue.createdAt).toLocaleDateString("ko-KR")}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>수정일</span>
-                  <span className="text-gray-700">
+                  <span className="text-gray-900">
                     {new Date(issue.updatedAt).toLocaleDateString("ko-KR")}
                   </span>
                 </div>
                 {issue.dueDate && (
                   <div className="flex justify-between">
                     <span>마감일</span>
-                    <span className="text-gray-700">
+                    <span className="text-gray-900">
                       {new Date(issue.dueDate).toLocaleDateString("ko-KR")}
                     </span>
                   </div>
@@ -557,7 +566,7 @@ export default function IssueDetailPage({
 
               {issue.labels && issue.labels.length > 0 && (
                 <div className="pt-2 border-t">
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">
                     라벨
                   </label>
                   <div className="flex gap-1 flex-wrap">
