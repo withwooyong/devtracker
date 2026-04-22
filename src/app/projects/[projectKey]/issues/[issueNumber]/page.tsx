@@ -22,6 +22,8 @@ export default function IssueDetailPage({
   const { projectKey, issueNumber } = use(params);
   const queryClient = useQueryClient();
   const [comment, setComment] = useState("");
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
@@ -79,26 +81,31 @@ export default function IssueDetailPage({
   });
 
   const commentMutation = useMutation({
-    mutationFn: (content: string) =>
+    mutationFn: (vars: { content: string; parentId?: string }) =>
       fetch(
         `/api/projects/${projectKey}/issues/${data?.issue?.id}/comments`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content }),
+          body: JSON.stringify(vars),
         }
       ).then((r) => {
         if (!r.ok) throw new Error("fetch failed");
         return r.json();
       }),
-    onSuccess: () => {
+    onSuccess: (_res, vars) => {
       queryClient.invalidateQueries({
         queryKey: ["issue", projectKey, issueNumber],
       });
       queryClient.invalidateQueries({
         queryKey: ["activities", projectKey, issueNumber],
       });
-      setComment("");
+      if (vars.parentId) {
+        setReplyContent("");
+        setReplyingTo(null);
+      } else {
+        setComment("");
+      }
     },
   });
 
@@ -259,28 +266,135 @@ export default function IssueDetailPage({
               {/* 댓글 tab */}
               {activeTab === "comments" && (
                 <div className="space-y-4">
-                  {issue.comments?.map((c) => (
-                    <div key={c.id} className="bg-white p-4 rounded-lg border">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-medium">
-                          {c.author.name.charAt(0)}
+                  {(() => {
+                    const all = issue.comments ?? [];
+                    const roots = all.filter((c) => !c.parentId);
+                    const repliesByParent = new Map<string, typeof all>();
+                    for (const c of all) {
+                      if (c.parentId) {
+                        const arr = repliesByParent.get(c.parentId) ?? [];
+                        arr.push(c);
+                        repliesByParent.set(c.parentId, arr);
+                      }
+                    }
+                    return roots.map((c) => {
+                      const replies = repliesByParent.get(c.id) ?? [];
+                      return (
+                        <div key={c.id} className="space-y-2">
+                          <div className="bg-white p-4 rounded-lg border">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-medium">
+                                {c.author.name.charAt(0)}
+                              </div>
+                              <span className="text-sm font-medium">
+                                {c.author.name}
+                              </span>
+                              <span className="text-xs text-gray-400">
+                                {new Date(c.createdAt).toLocaleString("ko-KR")}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                              {c.content}
+                            </p>
+                            <div className="mt-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setReplyingTo(
+                                    replyingTo === c.id ? null : c.id
+                                  )
+                                }
+                                className="text-xs text-gray-500 hover:text-blue-600"
+                              >
+                                {replyingTo === c.id ? "답글 취소" : "답글"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {replies.length > 0 && (
+                            <div className="ml-10 space-y-2">
+                              {replies.map((r) => (
+                                <div
+                                  key={r.id}
+                                  className="bg-gray-50 p-3 rounded-lg border"
+                                >
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-[10px] text-white font-medium">
+                                      {r.author.name.charAt(0)}
+                                    </div>
+                                    <span className="text-sm font-medium">
+                                      {r.author.name}
+                                    </span>
+                                    <span className="text-xs text-gray-400">
+                                      {new Date(r.createdAt).toLocaleString(
+                                        "ko-KR"
+                                      )}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                                    {r.content}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {replyingTo === c.id && (
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                if (replyContent.trim()) {
+                                  commentMutation.mutate({
+                                    content: replyContent,
+                                    parentId: c.id,
+                                  });
+                                }
+                              }}
+                              className="ml-10 bg-white p-3 rounded-lg border"
+                            >
+                              <textarea
+                                value={replyContent}
+                                onChange={(e) =>
+                                  setReplyContent(e.target.value)
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors h-20"
+                                placeholder="답글을 입력하세요..."
+                                autoFocus
+                              />
+                              <div className="flex justify-end gap-2 mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setReplyingTo(null);
+                                    setReplyContent("");
+                                  }}
+                                  className="px-3 py-1 text-sm text-gray-600"
+                                >
+                                  취소
+                                </button>
+                                <button
+                                  type="submit"
+                                  disabled={
+                                    commentMutation.isPending ||
+                                    !replyContent.trim()
+                                  }
+                                  className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
+                                >
+                                  답글 작성
+                                </button>
+                              </div>
+                            </form>
+                          )}
                         </div>
-                        <span className="text-sm font-medium">{c.author.name}</span>
-                        <span className="text-xs text-gray-400">
-                          {new Date(c.createdAt).toLocaleString("ko-KR")}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
-                        {c.content}
-                      </p>
-                    </div>
-                  ))}
+                      );
+                    });
+                  })()}
 
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
                       if (comment.trim()) {
-                        commentMutation.mutate(comment);
+                        commentMutation.mutate({ content: comment });
                       }
                     }}
                     className="bg-white p-4 rounded-lg border"

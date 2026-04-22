@@ -48,6 +48,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
 const createSchema = z.object({
   content: z.string().min(1),
+  parentId: z.string().optional(),
 });
 
 export async function POST(request: NextRequest, { params }: Params) {
@@ -74,7 +75,29 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   try {
     const body = await request.json();
-    const { content } = createSchema.parse(body);
+    const { content, parentId } = createSchema.parse(body);
+
+    // 대댓글: parent 검증 (존재 + 같은 이슈 + 1-depth 제한)
+    let parentAuthorId: string | null = null;
+    if (parentId) {
+      const parent = await prisma.comment.findFirst({
+        where: { id: parentId, issueId: issue.id },
+        select: { id: true, parentId: true, authorId: true },
+      });
+      if (!parent) {
+        return NextResponse.json(
+          { error: "상위 댓글을 찾을 수 없습니다." },
+          { status: 404 }
+        );
+      }
+      if (parent.parentId !== null) {
+        return NextResponse.json(
+          { error: "답글의 답글은 달 수 없습니다." },
+          { status: 400 }
+        );
+      }
+      parentAuthorId = parent.authorId;
+    }
 
     const recipients = new Set<string>();
     if (issue.assigneeId && issue.assigneeId !== user.userId) {
@@ -83,6 +106,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (issue.reporterId !== user.userId) {
       recipients.add(issue.reporterId);
     }
+    if (parentAuthorId && parentAuthorId !== user.userId) {
+      recipients.add(parentAuthorId);
+    }
 
     const comment = await prisma.$transaction(async (tx) => {
       const created = await tx.comment.create({
@@ -90,6 +116,7 @@ export async function POST(request: NextRequest, { params }: Params) {
           content,
           issueId: issue.id,
           authorId: user.userId,
+          parentId: parentId ?? null,
         },
         include: {
           author: {
@@ -108,12 +135,15 @@ export async function POST(request: NextRequest, { params }: Params) {
 
       if (recipients.size > 0) {
         const plain = content.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+        const title = parentId
+          ? `${project.key}-${issue.issueNumber} 에 새 답글`
+          : `${project.key}-${issue.issueNumber} 에 새 댓글`;
         await enqueueNotificationsTx(
           tx,
           Array.from(recipients).map((userId) => ({
             userId,
             type: "ISSUE_COMMENTED",
-            title: `${project.key}-${issue.issueNumber} 에 새 댓글`,
+            title,
             message: `${created.author.name}: ${plain.slice(0, 80)}`,
             link: `/projects/${project.key}/issues/${issue.issueNumber}`,
           }))

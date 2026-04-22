@@ -14,6 +14,7 @@ export interface Comment {
   id: string;
   issueId: string;
   authorId: string;
+  parentId?: string | null;
   content: string;
   createdAt: string;
   updatedAt: string;
