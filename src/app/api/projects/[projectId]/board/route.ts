@@ -56,6 +56,7 @@ export async function PATCH(
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error("[board PATCH]", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "입력값 오류" }, { status: 400 });
     }
