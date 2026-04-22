@@ -163,34 +163,34 @@ export default function SprintDetailPage({
           <p className="text-sm text-gray-500">불러오는 중…</p>
         ) : (
           <>
-            <div className="bg-white border border-gray-200 rounded-lg p-5 mb-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-xl font-bold text-gray-900 truncate">
+            <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-5 mb-4">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 md:gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-xl font-bold text-gray-900 truncate min-w-0 flex-1 md:flex-initial">
                       {sprint.name}
                     </h1>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${SPRINT_STATUS_COLORS[sprint.status]}`}
+                      className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${SPRINT_STATUS_COLORS[sprint.status]}`}
                     >
                       {SPRINT_STATUS_LABELS[sprint.status]}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 mt-1 break-words">
                     {projectData?.project?.name ?? projectKey} ·{" "}
                     {formatDate(sprint.startDate)} ~ {formatDate(sprint.endDate)}
                   </p>
                   {sprint.goal && (
-                    <p className="text-sm text-gray-700 mt-3 whitespace-pre-wrap">
+                    <p className="text-sm text-gray-700 mt-3 whitespace-pre-wrap break-words">
                       {sprint.goal}
                     </p>
                   )}
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex gap-2 flex-wrap md:flex-nowrap md:shrink-0">
                   {sprint.status === "PLANNED" && (
                     <button
                       onClick={() => updateSprint.mutate({ status: "ACTIVE" })}
-                      className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700"
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 whitespace-nowrap"
                     >
                       스프린트 시작
                     </button>
@@ -198,7 +198,7 @@ export default function SprintDetailPage({
                   {sprint.status === "ACTIVE" && (
                     <button
                       onClick={() => updateSprint.mutate({ status: "COMPLETED" })}
-                      className="px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700"
+                      className="px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 whitespace-nowrap"
                     >
                       스프린트 완료
                     </button>
@@ -209,7 +209,7 @@ export default function SprintDetailPage({
                         deleteSprint.mutate();
                       }
                     }}
-                    className="px-3 py-1.5 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50"
+                    className="px-3 py-1.5 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50 whitespace-nowrap"
                   >
                     삭제
                   </button>
@@ -278,10 +278,10 @@ export default function SprintDetailPage({
                           key={issue.id}
                           className="flex items-center gap-2 bg-white border border-gray-200 rounded px-2 py-1.5"
                         >
-                          <span className="text-xs text-gray-400 w-12">
+                          <span className="text-xs text-gray-400 shrink-0 w-12">
                             #{issue.issueNumber}
                           </span>
-                          <span className="flex-1 text-sm text-gray-800 truncate">
+                          <span className="min-w-0 flex-1 text-sm text-gray-800 truncate">
                             {issue.title}
                           </span>
                           <button
@@ -291,7 +291,7 @@ export default function SprintDetailPage({
                                 sprintValue: sprint.id,
                               })
                             }
-                            className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                            className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 shrink-0"
                           >
                             추가
                           </button>
@@ -311,34 +311,38 @@ export default function SprintDetailPage({
                   {issues.map((issue) => (
                     <li
                       key={issue.id}
-                      className="flex items-center gap-3 px-4 py-2.5"
+                      className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 py-2.5"
                     >
-                      <Link
-                        href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
-                        className="text-xs text-gray-400 w-12 hover:text-blue-600"
-                      >
-                        #{issue.issueNumber}
-                      </Link>
-                      <Link
-                        href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
-                        className="flex-1 text-sm text-gray-800 truncate hover:text-blue-600"
-                      >
-                        {issue.title}
-                      </Link>
-                      <StatusBadge status={issue.status} />
-                      <PriorityBadge priority={issue.priority} />
-                      <button
-                        onClick={() =>
-                          assignIssue.mutate({
-                            issueId: issue.id,
-                            sprintValue: null,
-                          })
-                        }
-                        className="text-xs text-gray-400 hover:text-red-600 px-2"
-                        title="스프린트에서 제거"
-                      >
-                        제거
-                      </button>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Link
+                          href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
+                          className="text-xs text-gray-400 shrink-0 hover:text-blue-600"
+                        >
+                          #{issue.issueNumber}
+                        </Link>
+                        <Link
+                          href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
+                          className="min-w-0 flex-1 text-sm text-gray-800 truncate hover:text-blue-600"
+                        >
+                          {issue.title}
+                        </Link>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                        <StatusBadge status={issue.status} />
+                        <PriorityBadge priority={issue.priority} />
+                        <button
+                          onClick={() =>
+                            assignIssue.mutate({
+                              issueId: issue.id,
+                              sprintValue: null,
+                            })
+                          }
+                          className="text-xs text-gray-400 hover:text-red-600 px-2 whitespace-nowrap"
+                          title="스프린트에서 제거"
+                        >
+                          제거
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
