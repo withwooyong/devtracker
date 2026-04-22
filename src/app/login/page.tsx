@@ -130,7 +130,7 @@ export default function LoginPage() {
 
         <div className="mt-6 p-3 bg-gray-50 rounded-lg text-xs text-gray-500">
           <p className="font-medium mb-1">테스트 계정 (비밀번호: yanadoo123)</p>
-          <p>관리자: withwooyong@yanadoocorp.com (Ted)</p>
+          <p>관리자: withwooyong@yanadoocorp.com (허우용)</p>
           <p>멤버: kookyh@yanadoocorp.com (Harrison)</p>
         </div>
       </div>

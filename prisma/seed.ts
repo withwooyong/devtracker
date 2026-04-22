@@ -9,7 +9,7 @@ const adapter = new PrismaLibSql({
 const prisma = new PrismaClient({ adapter });
 
 const users = [
-  { name: "Ted", email: "withwooyong@yanadoocorp.com", role: "ADMIN" },
+  { name: "허우용", email: "withwooyong@yanadoocorp.com", role: "ADMIN" },
   { name: "Harrison", email: "kookyh@yanadoocorp.com", role: "MEMBER" },
   { name: "Jonathan", email: "jonathan@yanadoocorp.com", role: "MEMBER" },
   { name: "Dior", email: "cj707.lee@yanadoocorp.com", role: "MEMBER" },
@@ -49,7 +49,7 @@ async function main() {
       name: "야나두 개발",
       key: "DEV",
       description: "야나두 메인 서비스 개발 프로젝트",
-      createdById: createdUsers["Ted"],
+      createdById: createdUsers["허우용"],
     },
   });
 
@@ -60,7 +60,7 @@ async function main() {
       name: "인프라 운영",
       key: "OPS",
       description: "인프라 및 운영 관련 업무",
-      createdById: createdUsers["Ted"],
+      createdById: createdUsers["허우용"],
     },
   });
 
@@ -93,7 +93,7 @@ async function main() {
       status: "DONE",
       priority: "MEDIUM",
       assigneeId: createdUsers["Harrison"],
-      reporterId: createdUsers["Ted"],
+      reporterId: createdUsers["허우용"],
       kanbanOrder: 0,
     },
     {
@@ -102,7 +102,7 @@ async function main() {
       status: "IN_PROGRESS",
       priority: "HIGH",
       assigneeId: createdUsers["Jonathan"],
-      reporterId: createdUsers["Ted"],
+      reporterId: createdUsers["허우용"],
       kanbanOrder: 0,
     },
     {
@@ -121,7 +121,7 @@ async function main() {
       status: "IN_REVIEW",
       priority: "MEDIUM",
       assigneeId: createdUsers["Jerome"],
-      reporterId: createdUsers["Ted"],
+      reporterId: createdUsers["허우용"],
       kanbanOrder: 0,
     },
     {
@@ -130,7 +130,7 @@ async function main() {
       status: "TODO",
       priority: "LOW",
       assigneeId: null,
-      reporterId: createdUsers["Ted"],
+      reporterId: createdUsers["허우용"],
       kanbanOrder: 1,
     },
     {
@@ -148,7 +148,7 @@ async function main() {
       status: "IN_PROGRESS",
       priority: "LOW",
       assigneeId: createdUsers["Lucius"],
-      reporterId: createdUsers["Ted"],
+      reporterId: createdUsers["허우용"],
       kanbanOrder: 1,
     },
     {
@@ -191,7 +191,7 @@ async function main() {
         status: "SUCCESS",
         description: "초기 릴리스",
         changes: "- 회원가입/로그인 기능\n- 메인 페이지\n- 결제 시스템 연동",
-        deployedById: createdUsers["Ted"],
+        deployedById: createdUsers["허우용"],
         deployedAt: new Date(),
       },
     });
