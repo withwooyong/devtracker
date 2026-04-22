@@ -3,6 +3,44 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-22] 모바일 반응형 9 Phase — 전 페이지 375px 대응
+
+### Added
+- `docs/plan/mobile-responsive-plan.md` 작업계획서 (9 Phase + 검증 기준 + 리스크) — `f45dc57`
+- `src/stores/ui-store.ts` — 사이드바 드로어 열림 상태(`isSidebarOpen`/`open`/`close`/`toggle`) — `f45dc57`
+- `src/hooks/use-media-query.ts` — `window.matchMedia` 기반 데스크톱 감지(`min-width: 1024px`) — `f45dc57`
+- `src/app/layout.tsx`에 `export const viewport: Viewport = { width: "device-width", initialScale: 1 }` — `f45dc57`
+- `src/components/layout/project-tabs.tsx` — 5탭(이슈 목록/칸반/스프린트/배포/설정) 공통 네비. `aria-current="page"`, `overflow-x-auto`로 모바일 가로 스크롤 — `b4277b2`
+- `src/components/issues/issue-card.tsx` — 모바일 이슈 목록 카드 뷰. 전체 Link, `line-clamp-2 break-words`, 라벨 `flex-wrap` — `d858091`
+- `MobileKanbanCard`(board/page.tsx 내) — 모바일에서 DnD 대체. 제목 Link + `PriorityBadge` + 상태 `<select>` + 담당자. `handleMobileStatusChange`로 기존 `boardMutation` 재사용 — `1909ff7`
+- `docs/ADR.md` ADR-026 신규 — "칸반 보드 모바일 대응 — DnD 대신 상태 pill + 카드 select". 맥락/결정/근거/대안/후속 — `1909ff7`
+- `tests/e2e/mobile-responsive.spec.ts` 신규 — 4개 스모크(사이드바 드로어, 이슈 목록 카드 뷰, 칸반 상태 pill, 프로젝트 탭) — `7ed3bdf`
+- `playwright.config.ts` `mobile-chrome` 프로젝트 추가(Pixel 5 393×851, `testMatch: /mobile-.*\.spec\.ts/`) — `7ed3bdf`
+
+### Changed
+- 레이아웃 셸: 사이드바를 모바일 `fixed` 드로어(`-translate-x-full` ↔ `translate-x-0`)로, `lg:` 이상 `static` 고정. 모바일+열림 시 `role="dialog"` + `aria-modal` + 첫 링크 auto-focus. 헤더에 햄버거 버튼(`lg:hidden`) + `data-sidebar-trigger`. 메인 영역 `inert`로 배경 포커스 격리, 드로어 닫힘 시 opener로 포커스 복귀. Esc/overlay 클릭 닫기. breadcrumb `truncate` + `sm:` 미만 중간 경로 숨김 — `f45dc57`
+- 5개 프로젝트 하위 페이지(이슈 목록/board/sprints/deployments/settings)의 중복 탭 블록(각 32줄 × 5)을 `<ProjectTabs projectKey={projectKey} />` 한 줄로 치환 — 순감 97줄. 헤더 wrapper에 `min-w-0 flex-1 gap-3`, h1 `truncate` — `b4277b2`
+- 이슈 목록: 모바일 `md:hidden space-y-2` 카드 리스트 + 데스크톱 `hidden md:block` 기존 6컬럼 table 분기. 필터 바 `flex-col md:flex-row md:flex-wrap`, 검색·select·저장 버튼 `w-full md:w-(auto|48)`. 저장된 필터 팝오버 `left-0 right-0 md:right-auto md:min-w-48`, relative 부모 `w-full md:w-auto` — `d858091`
+- 이슈 상세: `grid grid-cols-3` → `flex flex-col lg:grid lg:grid-cols-3 gap-4 lg:gap-6`. 메인 영역 먼저, 사이드바 아래 세로 스택. 댓글/활동/전체 탭 바 `overflow-x-auto` + `whitespace-nowrap`. 제목 `break-words`, 설명·댓글 3곳에 `whitespace-pre-wrap break-words` — `aa0dae7`
+- 칸반 보드: 모바일(`md:hidden`)에서 상태 pill 4개(`flex gap-2 overflow-x-auto`) + 활성 상태 단일 컬럼 카드 리스트 렌더. 카드의 `<select>`로 상태 변경 → `boardMutation` 재사용. 데스크톱(`hidden md:block`)은 기존 DndContext + 4컬럼 완전 보존 — `1909ff7`
+- board/deployments/settings 페이지 h1에서 suffix("- 칸반 보드"/"- 배포 이력"/" 설정") 제거. 페이지 식별은 ProjectTabs 활성 상태가 담당 — `5dcdd0f`
+- 배포 이력 카드: 헤더 `flex-col sm:flex-row`, 버전 그룹 `flex-wrap min-w-0` + 버전 span `break-words`, 생성일 `shrink-0`, 설명 `break-words`, 메타 줄 `flex-wrap gap-x-2 gap-y-1`. 환경 필터 바 `overflow-x-auto pb-1 -mx-1 px-1` + 버튼 `whitespace-nowrap` — `5dcdd0f`
+- 배포/스프린트/이슈/프로젝트 생성 폼의 2열 그리드 `grid grid-cols-2` → `grid grid-cols-1 sm:grid-cols-2` (버전/환경·시작일/종료일·상태/우선순위·담당자/마감일·프로젝트이름/키) — `5dcdd0f`·`644f22c`
+- 스프린트 목록 카드: 제목/상태 pill `gap-2`, 제목 `min-w-0 flex-1 truncate`, 상태 `whitespace-nowrap`, 목표 `break-words`, 메타 `flex-wrap gap-x-3 gap-y-1` — `5dcdd0f`
+- 스프린트 상세: 헤더 카드 `flex flex-col md:flex-row`, 좌측 `min-w-0 flex-1`, 제목+상태 pill `flex-wrap`, 버튼 그룹 `flex-wrap md:flex-nowrap`. 포함 이슈 `<li>`를 세로 스택(좌측 `#번호+제목` / 우측 `뱃지+제거`)으로 재편 — `3371ca6`
+- 로그인 페이지 외곽 `px-4 py-6` + 카드 `p-6 sm:p-8`로 모바일 여백 확보 — `644f22c`
+- 프로젝트 목록 카드 `flex-col sm:flex-row`로 재편. key pill `shrink-0`, 이름/설명 `truncate`, 카운트 그룹 `shrink-0` — `644f22c`
+- not-found/error 페이지 외곽 `px-4`. error는 메시지에 `max-w-md` + `break-words` — `644f22c`
+
+### Fixed
+- 긴 프로젝트 이름/이슈 제목/URL/댓글에서 모바일 가로 오버플로 유발 지점 일괄 제거(`break-words`, `truncate`, `min-w-0 flex-1`, `whitespace-nowrap + shrink-0` 패턴) — 전반
+
+### Documentation
+- `docs/e2e-testing-guide.md`: 15 Journey 69개 → 16 Journey **73개**. Journey 16(모바일 반응형 스모크 4) + playwright.config 이중 프로젝트 구조 설명 추가
+- `docs/plan/mobile-responsive-plan.md`: 9 Phase 작업계획서(목표·현황·설계 방침·각 Phase 체크리스트·검증 기준·리스크)
+
+---
+
 ## [2026-04-21] 기술 부채 정리 묶음
 
 ### Added
