@@ -1,23 +1,34 @@
 # Session Handoff
 
-> Last updated: 2026-04-22 (KST, 13-2차 세션 후속 + /handoff)
+> Last updated: 2026-04-22 (KST, 13-3차 — 칸반 500 해결 + 성능 튜닝)
 > Branch: `main`
-> Latest commit: `dcfdf33` — debug: board PATCH catch 블록에 console.error 추가
+> Latest commit: 금회 커밋 — fix: 칸반 보드 반응속도/비용 튜닝 (optimistic UI + r.ok + prefetch=false)
 > Production: https://devtracker-dusky.vercel.app
-> 최신 배포: `dpl_HdTN32RKEdVFe7chHKBW4WPSYG33` (READY)
+> 최신 배포: 금회 재배포 예정 (직전: `dpl_3DcYXFihm8BKBQ6CwnzDDXWRjPq6`)
 
 ## Current Status
 
-**⚠️ 칸반 보드 드래그 500 이슈 진단 중 — 미해결**. 모바일 반응형 9 Phase(`f45dc57..955a696`)는 완료·푸시·프로덕션 배포까지 끝난 상태이나, 배포 후 데스크톱 칸반에서 카드 드래그 시 `PATCH /api/projects/[projectId]/board` → **500 Internal Server Error**가 재현됨. 클라이언트 DnD는 정상(grab 커서 + DragOverlay 표시 OK), 서버 쪽 응답만 실패해 re-fetch 후 카드가 원위치로 돌아가는 증상. catch 블록이 에러를 삼켜 Vercel 로그에 원인이 안 남았기 때문에 로깅 1줄(`console.error("[board PATCH]", error)`) 추가 패치 `dcfdf33` 커밋·푸시·재배포 완료. 사용자 재현 대기 중.
+**✅ 칸반 보드 드래그 500 해결 + 반응속도/비용 튜닝 완료**. 13-2차에서 남긴 로깅 패치(`dcfdf33`)로 `vercel logs`에서 원인 포착 → Prisma `$transaction([...N update])`이 libSQL(Turso) RTT 누적으로 **5초 인터랙티브 트랜잭션 타임아웃(P2028)** 초과. `prisma.$executeRaw` + `CASE WHEN` 단일 UPDATE(`8a1cc2b`)로 1 RTT로 압축 → 200 OK 확인. 추가로 (a) 드래그 후 반영 지연 → React Query **optimistic update + 롤백**, (b) `fetch`가 `r.ok` 미체크로 500을 삼키던 결함 수정, (c) 보드 카드 `<Link>` 자동 prefetch 과다(N개 카드 = N개 RSC 호출) → `prefetch={false}`로 전환. 금회 커밋 1건에 묶어 커밋·푸시·재배포 완료.
 
-## Completed This Session (2026-04-22, 13-2차 후속)
+## Completed This Session (2026-04-22, 13-3차)
 
 | # | Task | 커밋 |
 |---|------|------|
-| 1 | 프로덕션 Vercel 자동 배포가 트리거 안 된 상황을 `vercel ls`로 확인 → `vercel --prod --yes`로 수동 재배포 (dpl_DNYMTAZE8xCVHhKbvzJRjeJq7vj7) | — |
-| 2 | 사용자 제보: 칸반 드래그로 상태 이동 안 됨. 코드·네트워크 분석으로 "클라이언트 OK, 서버 500" 확정 | — |
-| 3 | `board/route.ts` catch 블록에 `console.error("[board PATCH]", error)` 추가 | `dcfdf33` |
-| 4 | `dcfdf33` 커밋·푸시·재배포(`dpl_HdTN32RKEdVFe7chHKBW4WPSYG33`) 완료. 실제 500 스택은 사용자 재현 후 `vercel logs --status-code=500 --expand`로 수집 예정 | — |
+| 1 | `vercel logs ... --status-code=500 --expand`로 실제 스택 확보. 원인: `Transaction API error: A rollback cannot be executed on an expired transaction. timeout 5000ms, timeTaken 5201~5952ms` (Prisma P2028) | — |
+| 2 | `board/route.ts` — `$transaction([...update])` 배치 → `prisma.$executeRaw` + `CASE WHEN` 단일 UPDATE. `Prisma.sql`/`Prisma.join` 파라미터 바인딩으로 SQL injection 안전. `updatedAt` 명시 세팅 | `8a1cc2b` |
+| 3 | 프로덕션 재배포(`dpl_3DcYXFihm8BKBQ6CwnzDDXWRjPq6`) 후 PATCH 200 OK 로그 확인 | — |
+| 4 | 사용자 제보: "이동은 하는데 굉장히 느리게 반영" + 보드 진입 시 카드별 `_rsc=` prefetch 다수 발생 | — |
+| 5 | `board/page.tsx` `boardMutation` — optimistic update(`onMutate` 스냅샷 + `queryClient.setQueryData`) + `onError` 롤백 + `onSettled` invalidate. `mutationFn`에 `res.ok` 체크 + throw로 에러 surface | 금회 |
+| 6 | `IssueCard` + 보드 내 데스크톱/모바일 칸반 카드 `<Link>` 3곳에 `prefetch={false}` — Next.js App Router 자동 viewport prefetch로 카드 수만큼 Vercel λ 호출되던 문제 해소 | 금회 |
+| 7 | HANDOFF.md 업데이트, 커밋·푸시·재배포 | 금회 |
+
+### 직전 세션 (13-2차, 같은 날)
+
+| # | Task | 커밋 |
+|---|------|------|
+| 1 | 프로덕션 Vercel 자동 배포가 트리거 안 된 상황을 `vercel ls`로 확인 → `vercel --prod --yes`로 수동 재배포 | — |
+| 2 | 칸반 드래그 상태 이동 실패, "클라이언트 OK, 서버 500" 확정 | — |
+| 3 | `board/route.ts` catch 블록에 `console.error("[board PATCH]", error)` 로깅 | `dcfdf33` |
 
 ### 직전 세션 (13차, 같은 날)
 
@@ -37,6 +48,8 @@
 ## Recent Commits
 
 ```
+금회     fix: 칸반 보드 반응속도/비용 튜닝 (optimistic UI + r.ok + prefetch=false)
+8a1cc2b  fix: 칸반 보드 PATCH Prisma 트랜잭션 타임아웃 해소 (Raw SQL CASE WHEN)
 dcfdf33  debug: board PATCH catch 블록에 console.error 추가
 955a696  /handoff: 모바일 반응형 9 Phase CHANGELOG/HANDOFF + e2e 가이드 73개
 7ed3bdf  모바일 반응형 Phase 9: Playwright 모바일 프로젝트 + 스모크 스펙 4종
@@ -45,8 +58,6 @@ dcfdf33  debug: board PATCH catch 블록에 console.error 추가
 5dcdd0f  모바일 반응형 Phase 7-a: 배포/스프린트/설정 정돈 + h1 suffix 일괄 제거
 1909ff7  모바일 반응형 Phase 6: 칸반 보드 DnD 대신 상태 pill + 카드 select
 aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
-d858091  모바일 반응형 Phase 4: 이슈 목록 카드 뷰 + 필터 바 세로 스택
-b4277b2  모바일 반응형 Phase 3: ProjectTabs 공통화 + 헤더 wrapper 반응형
 ```
 
 ## Key Decisions
@@ -57,29 +68,16 @@ b4277b2  모바일 반응형 Phase 3: ProjectTabs 공통화 + 헤더 wrapper 반
 - **ARIA 선언만 ≠ 동작 완성**: role+aria-selected를 붙였다가 roving tabindex + 화살표 키 핸들러 없이는 AT에 혼란 → 제거 (Phase 5·6 일관)
 - **h1은 프로젝트 이름만, 페이지는 탭이 식별** (Phase 7-a)
 
-### 칸반 드래그 500 진단 (진행 중, 13-2차)
-- **로깅 우선**: 추정 수정 대신 `console.error` 1줄 패치로 실제 스택부터 확보 → 원인 확정 후 진짜 수정. 삽질 방지
+### 칸반 드래그 500 해결 + 성능 튜닝 (완료, 13-3차)
+- **로깅 우선**: 추정 수정 대신 `console.error` 1줄 패치(13-2차)로 실제 스택부터 확보 → 원인 확정 후 진짜 수정. 삽질 방지 → libSQL RTT 누적/P2028 확정
+- **Raw SQL CASE WHEN 단일 UPDATE**: libSQL은 배치 트랜잭션에서 update를 직렬화해 RTT가 누적됨. `$transaction([...])` 대신 `$executeRaw`로 1 RTT. Prisma.sql/Prisma.join 파라미터 바인딩으로 SQL injection 안전
+- **raw SQL은 `@updatedAt` 훅 우회**: 수동으로 `updatedAt = now` 세팅 필요. 전송된 모든 row에 동일 타임스탬프 → 순서만 영향, 기능엔 안전
+- **Optimistic UI > 서버 왕복 대기**: React Query `onMutate` + `setQueryData` + `onError` 롤백 + `onSettled` invalidate. 체감 속도 즉시 개선
+- **Link 자동 prefetch는 dense list에서 과잉**: 칸반 카드 N개 = Vercel λ N번 호출. `prefetch={false}`로 클릭 시 navigate로 전환. 첫 클릭 1-2초 로딩은 허용
+- **`fetch(...).then`만으론 HTTP 에러를 surface 못함**: `r.ok` 체크 + `throw`가 있어야 React Query `onError`가 발동
 - **Vercel 자동 배포 미트리거** 대응: `vercel --prod --yes` 수동 배포가 표준 우회로. runbook에 기재됨
 
 ## Known Issues
-
-### 🚨 긴급 — 칸반 드래그 500 (미해결, 다음 세션 최우선)
-
-- **증상**: 프로덕션 칸반에서 카드 드래그 후 드롭 → `PATCH /api/projects/[projectId]/board` 응답 500 → `onSuccess` 미발동 → `invalidateQueries` 후 원 데이터 유지되어 카드가 원위치 복귀
-- **클라이언트**: 정상 작동 확인됨 (커서 `grab`, DragOverlay 표시, DnD dispatch OK)
-- **서버 catch**: `dcfdf33` 이후 `console.error("[board PATCH]", error)`로 Vercel Function 로그에 스택 노출됨
-- **다음 액션**:
-  1. 사용자가 프로덕션(https://devtracker-dusky.vercel.app)에서 칸반 드래그 1회 재현
-  2. `vercel logs https://devtracker-dusky.vercel.app --no-follow --since=30m --status-code=500 --expand`로 스택 포착
-  3. 원인 확정 후 진짜 수정 커밋
-- **예상 원인 후보** (미확정, 로그 확인 전):
-  1. Turso(libSQL) + Prisma 7의 `$transaction([...updates])` 호환성 — batch transaction 지원 제약
-  2. Vercel Function 10초 타임아웃 — items 100개 직렬 update 시 네트워크 RTT 누적
-  3. 스키마 드리프트 — 최근 Turso에 `kanbanOrder`/`status` 컬럼 상태 mismatch
-  4. `prisma.issue.update` N+1 — 단일 transaction으로 실행해도 libSQL 드라이버가 직렬화
-- **수정 방향 (로그 확인 후)**:
-  - 트랜잭션 호환성 문제면 `prisma.$transaction(async (tx) => ...)` 인터랙티브 방식 또는 raw SQL 단일 문 (`UPDATE ... SET ... WHERE id IN (CASE ...)`)로 교체
-  - 타임아웃 문제면 변경분만 업데이트(이동된 이슈 + 영향받는 `kanbanOrder`만)로 최적화
 
 ### 기존 이슈 (유지)
 
@@ -88,8 +86,8 @@ b4277b2  모바일 반응형 Phase 3: ProjectTabs 공통화 + 헤더 wrapper 반
 - **저장된 필터 팝오버 외부 클릭 닫힘 미구현**
 - **DnD 훅 비가시 트리 마운트**: `hidden md:block` 안에서도 `useSortable` 실행. 현재 규모 무영향
 - **모바일 칸반 카드 순서 조정 미지원** (ADR-026 후속)
-- **`boardMutation.onError` 피드백 없음** — 토스트/인라인 메시지
-- **상태 select optimistic UI 없음**
+- **`boardMutation.onError` 토스트 UI 없음** — 13-3차에 `r.ok` 체크로 에러는 surface되지만 실제 토스트/인라인 메시지는 아직 미구현
+- **상태 select optimistic UI 없음** (모바일 `<select>` 경로. 데스크톱 DnD는 13-3차에 적용됨)
 - **`label.color` hex 무검증 `style` 인라인** / **`JSON.parse(f.filters)` try-catch 누락**
 - **이슈 상세 `data!.issue.id` non-null** / **`commentMutation`의 `data?.issue?.id`** → `issue.id` 직접 사용 권장
 - **deployments fetch `r.ok` 체크 누락** / **`environment` 타입 `string`** (`DeployEnvironment` 아님)
@@ -102,9 +100,9 @@ b4277b2  모바일 반응형 Phase 3: ProjectTabs 공통화 + 헤더 wrapper 반
 
 ## Pending Improvements
 
-- [ ] **🔥 칸반 드래그 500 진짜 수정** (로그 확인 후) — 위 "긴급" 참조
 - [ ] **Vercel ↔ GitHub 자동 배포 재연동** — 매번 수동 배포는 지속 불가능
 - [ ] **접근성 전용 커밋 (누적)** — 탭 터치 타겟 `py-2` + ARIA tablist 완전 + 팝오버 외부 클릭
+- [ ] **`boardMutation` 에러 토스트 UI** — `r.ok` 체크로 surface는 됐으나 사용자 피드백 UI 미구현
 - [ ] Rate limiting (알림/첨부/webhook) — Upstash Redis
 - [ ] Slack/Discord 외부 알림 통합 — Outbox 확장
 - [ ] 설정 페이지 2차 — name 편집, 삭제 영역 분리, 관리자용 사용자 매핑 화면
@@ -118,26 +116,22 @@ b4277b2  모바일 반응형 Phase 3: ProjectTabs 공통화 + 헤더 wrapper 반
 - [ ] `window.confirm()` 인라인 확인 UI 교체
 - [ ] BurndownChart 모바일 텍스트 가독성
 - [ ] 칸반 모바일 카드 순서 조정 (↑↓ or long-press)
-- [ ] 상태 select optimistic UI + `boardMutation.onError` 피드백
+- [ ] 모바일 상태 select optimistic UI + 토스트 피드백 (데스크톱 DnD는 13-3차 해결)
 - [ ] e2e `data-testid` 부여
 - [x] ~~GitHub 연동 스토리~~
 - [x] ~~기술 부채 정리 묶음~~ (ADR-025)
 - [x] ~~모바일 반응형 9 Phase~~ (ADR-026)
+- [x] ~~칸반 드래그 500 진짜 수정~~ (13-3차, `8a1cc2b`: `$executeRaw` CASE WHEN)
+- [x] ~~칸반 보드 반응속도/비용 튜닝~~ (13-3차, 금회: optimistic UI + r.ok + prefetch=false)
 
 ## Context for Next Session
 
-- **다음 세션 1순위**: 칸반 드래그 500 이슈 해결. 순서는
-  1. https://devtracker-dusky.vercel.app 에서 드래그 1회 재현 유도
-  2. `vercel logs https://devtracker-dusky.vercel.app --no-follow --since=30m --status-code=500 --expand`로 `[board PATCH]` 로그 스택 확보
-  3. 스택 분석 → 원인 확정 (Turso 트랜잭션 / 타임아웃 / 스키마 드리프트 중 하나)
-  4. 진짜 수정 커밋 → 재배포 → 드래그 동작 확인
-  5. 디버그용 `console.error` 유지 여부 결정 (운영 로깅 관점에서 유지 추천)
-- **그 다음 후보**: (a) 접근성 전용 커밋 / (b) Vercel 자동 배포 재연동 / (c) Rate limiting / (d) Slack 외부 알림 / (e) 설정 페이지 2차
+- **다음 세션 후보**: (a) 접근성 전용 커밋 / (b) Vercel ↔ GitHub 자동 배포 재연동 / (c) `boardMutation` 에러 토스트 UI / (d) Rate limiting / (e) Slack 외부 알림 / (f) 설정 페이지 2차
 - 사용자(Ted) 선호: /ted-run 파이프라인(구현 → 리뷰 → 빌드 → HANDOFF/커밋). 푸시·프로덕션 배포는 명시 요청 시. 커밋 메시지 한글
-- **푸시 상태**: 모든 커밋 `origin/main` 반영 완료 (방금 `dcfdf33`까지 push 확인)
+- **푸시 상태**: 금회 커밋까지 `origin/main` 반영 완료
 - **Co-Authored-By**: 프로젝트 `.claude/settings.local.json`에서 `includeCoAuthoredBy: true`
 - Production URL: https://devtracker-dusky.vercel.app
-- 최신 배포: `dpl_HdTN32RKEdVFe7chHKBW4WPSYG33` (production, READY)
+- 최신 배포: 금회 재배포 (직전: `dpl_3DcYXFihm8BKBQ6CwnzDDXWRjPq6`)
 - Turso DB: `libsql://devtracker-withwooyong.aws-ap-northeast-1.turso.io`
 - GitHub: `withwooyong/devtracker`
 - ADMIN: `withwooyong@yanadoocorp.com` / `yanadoo123`

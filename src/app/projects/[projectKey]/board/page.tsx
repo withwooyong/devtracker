@@ -63,6 +63,7 @@ function KanbanCard({
     >
       <Link
         href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
+        prefetch={false}
         className="text-sm font-medium text-gray-900 hover:text-blue-600 block mb-2"
         onClick={(e) => e.stopPropagation()}
       >
@@ -100,6 +101,7 @@ function MobileKanbanCard({
       <div className="flex items-start justify-between gap-2 mb-2">
         <Link
           href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
+          prefetch={false}
           className="min-w-0 flex-1"
         >
           <span className="text-xs text-gray-500">
@@ -208,15 +210,46 @@ export default function BoardPage({
   });
 
   const boardMutation = useMutation({
-    mutationFn: (
+    mutationFn: async (
       items: { id: string; status: IssueStatus; kanbanOrder: number }[]
-    ) =>
-      fetch(`/api/projects/${projectKey}/board`, {
+    ) => {
+      const res = await fetch(`/api/projects/${projectKey}/board`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items }),
-      }),
-    onSuccess: () => {
+      });
+      if (!res.ok) {
+        throw new Error(`PATCH /board 실패 (${res.status})`);
+      }
+      return res.json();
+    },
+    onMutate: async (items) => {
+      const queryKey = ["issues", projectKey, "board"];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<{ issues: Issue[] }>(queryKey);
+      if (previous) {
+        const updateMap = new Map(items.map((u) => [u.id, u]));
+        queryClient.setQueryData<{ issues: Issue[] }>(queryKey, {
+          ...previous,
+          issues: previous.issues.map((issue) => {
+            const u = updateMap.get(issue.id);
+            return u
+              ? { ...issue, status: u.status, kanbanOrder: u.kanbanOrder }
+              : issue;
+          }),
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(
+          ["issues", projectKey, "board"],
+          ctx.previous
+        );
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: ["issues", projectKey, "board"],
       });

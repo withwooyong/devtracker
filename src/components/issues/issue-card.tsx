@@ -14,6 +14,7 @@ export function IssueCard({
   return (
     <Link
       href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
+      prefetch={false}
       className="block bg-white rounded-lg border border-gray-200 p-3 hover:border-blue-300 hover:shadow-sm transition"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
