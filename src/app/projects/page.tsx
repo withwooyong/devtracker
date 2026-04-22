@@ -40,11 +40,11 @@ export default function ProjectsPage() {
   return (
     <MainLayout>
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 gap-3">
           <h1 className="text-2xl font-bold text-gray-900">프로젝트</h1>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap"
           >
             새 프로젝트
           </button>
@@ -58,7 +58,7 @@ export default function ProjectsPage() {
             }}
             className="bg-white p-4 rounded-lg border border-gray-200 mb-6 space-y-3"
           >
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   프로젝트 이름
@@ -125,23 +125,23 @@ export default function ProjectsPage() {
                 href={`/projects/${project.key}`}
                 className="block p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="w-10 h-10 bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center font-bold text-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-10 h-10 bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center font-bold text-sm shrink-0">
                       {project.key}
                     </span>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate">
                         {project.name}
                       </h3>
                       {project.description && (
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-500 truncate">
                           {project.description}
                         </p>
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-4 text-sm text-gray-500">
+                  <div className="flex gap-4 text-sm text-gray-500 shrink-0">
                     <span>이슈 {project._count?.issues ?? 0}</span>
                     <span>배포 {project._count?.deployments ?? 0}</span>
                   </div>

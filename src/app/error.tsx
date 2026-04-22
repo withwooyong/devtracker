@@ -8,12 +8,12 @@ export default function ErrorPage({
   reset: () => void;
 }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="text-center max-w-md">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
           오류가 발생했습니다
         </h2>
-        <p className="text-gray-600 mb-6 text-sm">
+        <p className="text-gray-600 mb-6 text-sm break-words">
           {process.env.NODE_ENV === "development"
             ? error.message
             : "알 수 없는 오류가 발생했습니다."}

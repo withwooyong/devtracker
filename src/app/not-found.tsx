@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function NotFoundPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
           페이지를 찾을 수 없습니다
