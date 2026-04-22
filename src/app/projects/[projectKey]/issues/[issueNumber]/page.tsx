@@ -6,6 +6,7 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { ActivityTimeline } from "@/components/common/activity-timeline";
 import { AttachmentList } from "@/components/common/attachment-list";
 import { GitHubLinkList } from "@/components/common/github-link-list";
+import { RichEditor } from "@/components/common/rich-editor";
 import Link from "next/link";
 import type { Issue } from "@/types/issue";
 import type { User } from "@/types/user";
@@ -209,8 +210,11 @@ export default function IssueDetailPage({
                   </button>
                 </div>
                 {issue.description && (
-                  <div className="mt-4 text-sm text-gray-700 whitespace-pre-wrap break-words">
-                    {issue.description}
+                  <div className="mt-4 text-sm break-words">
+                    <RichEditor
+                      content={issue.description}
+                      editable={false}
+                    />
                   </div>
                 )}
               </div>

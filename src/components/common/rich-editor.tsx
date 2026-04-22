@@ -7,7 +7,7 @@ import { useEffect } from "react";
 
 interface RichEditorProps {
   content: string;
-  onChange: (html: string) => void;
+  onChange?: (html: string) => void;
   placeholder?: string;
   editable?: boolean;
 }
@@ -50,7 +50,7 @@ export function RichEditor({
     editable,
     immediatelyRender: false,
     onUpdate({ editor }) {
-      onChange(editor.getHTML());
+      onChange?.(editor.getHTML());
     },
   });
 
@@ -70,7 +70,13 @@ export function RichEditor({
   }, [editor, content]);
 
   return (
-    <div className="border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+    <div
+      className={
+        editable
+          ? "border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500"
+          : ""
+      }
+    >
       {editable && editor && (
         <div className="flex flex-wrap gap-1 p-2 border-b border-gray-200 bg-gray-50 rounded-t-lg">
           <ToolbarButton
@@ -134,7 +140,11 @@ export function RichEditor({
       )}
       <EditorContent
         editor={editor}
-        className="prose prose-sm max-w-none p-3 min-h-[120px] outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-[96px] [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-gray-400 [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none [&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left [&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0"
+        className={`prose prose-sm max-w-none outline-none text-gray-900 [&_.ProseMirror]:outline-none [&_.ProseMirror]:text-gray-900 [&_.ProseMirror_p]:text-gray-900 [&_.ProseMirror_li]:text-gray-900 [&_.ProseMirror_strong]:text-gray-900 [&_.ProseMirror_h1]:text-gray-900 [&_.ProseMirror_h2]:text-gray-900 [&_.ProseMirror_h3]:text-gray-900 ${
+          editable
+            ? "p-3 min-h-[120px] [&_.ProseMirror]:min-h-[96px]"
+            : ""
+        } [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-gray-400 [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none [&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left [&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0`}
       />
     </div>
   );

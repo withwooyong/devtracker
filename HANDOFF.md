@@ -1,24 +1,30 @@
 # Session Handoff
 
-> Last updated: 2026-04-22 (KST, 13-4차 — 칸반 같은 컬럼 순서 변경 수정)
+> Last updated: 2026-04-22 (KST, 13-5차 — 에디터 가독성 + 상세 HTML 렌더)
 > Branch: `main`
-> Latest commit: 금회 커밋 — fix: 칸반 같은 컬럼 내 순서 변경 동작 (useDroppable + arrayMove)
+> Latest commit: 금회 커밋 — fix: 이슈 설명 에디터 가독성 + 상세 뷰 RichEditor 재사용
 > Production: https://devtracker-dusky.vercel.app
-> 최신 배포: 금회 재배포 예정 (직전: `dpl_3yZNBaWUHc1ffcWkqrr64jNTxs7R`)
+> 최신 배포: 금회 재배포 예정 (직전: `dpl_5SSEDHy4hjbbRgmfzNCk6jDt1FWa`)
 
 ## Current Status
 
 **✅ 칸반 보드 드래그 500 해결 + 반응속도/비용 튜닝 + 같은 컬럼 순서 변경 수정 완료**. 13-2차에서 남긴 로깅 패치(`dcfdf33`)로 `vercel logs`에서 원인 포착 → Prisma `$transaction([...N update])`이 libSQL(Turso) RTT 누적으로 **5초 인터랙티브 트랜잭션 타임아웃(P2028)** 초과. `prisma.$executeRaw` + `CASE WHEN` 단일 UPDATE(`8a1cc2b`)로 1 RTT로 압축. 13-3차에서 optimistic UI + `r.ok` 체크 + `prefetch={false}`로 반응속도/비용 튜닝(`e47d976`). 13-4차(금회)에서 같은 컬럼 내 카드 순서 변경이 작동 안 하던 이슈 수정 — `KanbanColumn`에 `useSortable({ disabled: true })`를 잘못 사용한 것을 `useDroppable`로 교체하고, `handleDragEnd`의 splice 두 번 꼬임을 `@dnd-kit/sortable`의 `arrayMove` 유틸로 단순화. 제자리 드래그 early return도 추가.
 
-## Completed This Session (2026-04-22, 13-4차)
+## Completed This Session (2026-04-22, 13-5차)
 
 | # | Task | 커밋 |
 |---|------|------|
-| 1 | 사용자 제보: "각 카드 영역별 순서를 변경할 수가 없다" — 같은 컬럼 내 순서 변경 불가 | — |
-| 2 | 원인 확정: (a) `KanbanColumn`에 `useSortable({ disabled: true })` 오용 (SortableContext 밖 column엔 `useDroppable`이 맞음), (b) `handleDragEnd` same-column 분기의 splice 두 번 방식이 인덱스 꼬여 맨 뒤로 `push`되는 경계 케이스 존재 | — |
-| 3 | `board/page.tsx` — `KanbanColumn` `useSortable` → `useDroppable` 교체 | 금회 |
-| 4 | `handleDragEnd` — same-column 분기를 `@dnd-kit/sortable`의 `arrayMove` 유틸로 재작성, `activeId === overId` / `oldIndex === newIndex` early return 추가, cross-column 분기도 immutable 스타일로 정리 | 금회 |
+| 1 | 사용자 제보 3건: (a) 이슈 생성 화면 설명 에디터 폰트 흐려 가독성 나쁨, (b) 이슈 상세에 HTML 태그가 그대로 노출, (c) 댓글 구조를 대댓글 구조로 개선 — (a)/(b)만 금회, (c)는 스펙 논의 후 별도 | — |
+| 2 | `rich-editor.tsx` — `EditorContent`에 `text-gray-900` + ProseMirror 내부 요소별 색상 명시(prose 기본 중간 회색 override). 가독성 개선 | 금회 |
+| 3 | `rich-editor.tsx` — `onChange?` optional로 완화, `editable=false`일 때 border/focus-ring/padding 제거하여 순수 뷰어 모드로 동작하게 함 | 금회 |
+| 4 | `issues/[issueNumber]/page.tsx` — description 렌더를 `<pre-wrap>`에서 `<RichEditor content editable={false} />`로 교체. Tiptap schema 기반 렌더라 XSS 안전(`dangerouslySetInnerHTML` 미사용) | 금회 |
 | 5 | HANDOFF.md 업데이트, 커밋·푸시·재배포 | 금회 |
+
+### 직전 세션 (13-4차)
+
+| # | Task | 커밋 |
+|---|------|------|
+| 1 | 같은 컬럼 내 카드 순서 변경 불가 수정. `KanbanColumn` `useSortable({disabled:true})` → `useDroppable`로 교체 + `handleDragEnd`를 `arrayMove`로 재작성 | `088e565` |
 
 ### 직전 세션 (13-3차)
 
@@ -55,7 +61,8 @@
 ## Recent Commits
 
 ```
-금회     fix: 칸반 같은 컬럼 내 순서 변경 동작 (useDroppable + arrayMove)
+금회     fix: 이슈 설명 에디터 가독성 + 상세 뷰 RichEditor 재사용
+088e565  fix: 칸반 같은 컬럼 내 순서 변경 동작 (useDroppable + arrayMove)
 e47d976  fix: 칸반 보드 반응속도/비용 튜닝 (optimistic UI + r.ok + prefetch=false)
 8a1cc2b  fix: 칸반 보드 PATCH Prisma 트랜잭션 타임아웃 해소 (Raw SQL CASE WHEN)
 dcfdf33  debug: board PATCH catch 블록에 console.error 추가
@@ -89,6 +96,8 @@ aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 
 ### 기존 이슈 (유지)
 
+- **이슈 상세 편집 모드는 여전히 `<textarea>` 사용** — new 경로(RichEditor)와 불일치. HTML 원본을 raw로 편집하는 상태. 상세 편집도 RichEditor로 전환 필요 (13-5차 후속)
+- **이슈 댓글 대댓글 구조 미구현** — Comment 스키마에 `parentId` 없음. Turso 마이그레이션 + API + 재귀 렌더 UI + 알림 확장 필요 (13-5차 후속, 스펙 논의 대기)
 - **탭 터치 타겟 `py-2` 미적용** — 접근성 전용 커밋에서 일괄 처리
 - **ARIA tablist/radiogroup 완전 구현 미실시** — roving tabindex + 화살표 키
 - **저장된 필터 팝오버 외부 클릭 닫힘 미구현**
@@ -108,6 +117,8 @@ aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 
 ## Pending Improvements
 
+- [ ] **이슈 댓글 대댓글 구조** — Comment.parentId 스키마 + Turso 마이그 + API + 재귀 UI + 알림. 스펙 결정 필요(depth 제한, UI 들여쓰기, 알림 대상)
+- [ ] **이슈 상세 편집 모드 RichEditor 전환** — 현재 textarea로 HTML raw 편집됨
 - [ ] **Vercel ↔ GitHub 자동 배포 재연동** — 매번 수동 배포는 지속 불가능
 - [ ] **접근성 전용 커밋 (누적)** — 탭 터치 타겟 `py-2` + ARIA tablist 완전 + 팝오버 외부 클릭
 - [ ] **`boardMutation` 에러 토스트 UI** — `r.ok` 체크로 surface는 됐으나 사용자 피드백 UI 미구현
@@ -131,7 +142,8 @@ aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 - [x] ~~모바일 반응형 9 Phase~~ (ADR-026)
 - [x] ~~칸반 드래그 500 진짜 수정~~ (13-3차, `8a1cc2b`: `$executeRaw` CASE WHEN)
 - [x] ~~칸반 보드 반응속도/비용 튜닝~~ (13-3차, `e47d976`: optimistic UI + r.ok + prefetch=false)
-- [x] ~~칸반 같은 컬럼 내 카드 순서 변경~~ (13-4차, 금회: useDroppable + arrayMove)
+- [x] ~~칸반 같은 컬럼 내 카드 순서 변경~~ (13-4차, `088e565`: useDroppable + arrayMove)
+- [x] ~~이슈 설명 에디터 가독성 + 상세 HTML 렌더~~ (13-5차, 금회: text-gray-900 + RichEditor 뷰어 모드)
 
 ## Context for Next Session
 
@@ -140,7 +152,7 @@ aa0dae7  모바일 반응형 Phase 5: 이슈 상세 페이지 1열 전환
 - **푸시 상태**: 금회 커밋까지 `origin/main` 반영 완료
 - **Co-Authored-By**: 프로젝트 `.claude/settings.local.json`에서 `includeCoAuthoredBy: true`
 - Production URL: https://devtracker-dusky.vercel.app
-- 최신 배포: 금회 재배포 (직전: `dpl_3yZNBaWUHc1ffcWkqrr64jNTxs7R`)
+- 최신 배포: 금회 재배포 (직전: `dpl_5SSEDHy4hjbbRgmfzNCk6jDt1FWa`)
 - Turso DB: `libsql://devtracker-withwooyong.aws-ap-northeast-1.turso.io`
 - GitHub: `withwooyong/devtracker`
 - ADMIN: `withwooyong@yanadoocorp.com` / `yanadoo123`
