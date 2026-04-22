@@ -86,6 +86,59 @@ function KanbanCard({
   );
 }
 
+function MobileKanbanCard({
+  issue,
+  projectKey,
+  onStatusChange,
+}: {
+  issue: Issue;
+  projectKey: string;
+  onStatusChange: (issue: Issue, status: IssueStatus) => void;
+}) {
+  return (
+    <div className="bg-white p-3 rounded-lg border border-gray-200">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <Link
+          href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
+          className="min-w-0 flex-1"
+        >
+          <span className="text-xs text-gray-500">
+            {projectKey}-{issue.issueNumber}
+          </span>
+          <h3 className="text-sm font-medium text-gray-900 mt-0.5 line-clamp-2 break-words">
+            {issue.title}
+          </h3>
+        </Link>
+        <PriorityBadge priority={issue.priority} />
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <select
+          value={issue.status}
+          onChange={(e) =>
+            onStatusChange(issue, e.target.value as IssueStatus)
+          }
+          className="text-xs border border-gray-300 rounded px-2 py-1 text-gray-700"
+          aria-label="상태 변경"
+        >
+          {COLUMNS.map((col) => (
+            <option key={col.id} value={col.id}>
+              {col.label}
+            </option>
+          ))}
+        </select>
+        {issue.assignee && (
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 min-w-0">
+            <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-[10px] text-white font-medium flex-shrink-0">
+              {issue.assignee.name.charAt(0)}
+            </div>
+            <span className="truncate">{issue.assignee.name}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function KanbanColumn({
   column,
   issues,
@@ -136,6 +189,7 @@ export default function BoardPage({
   const { projectKey } = use(params);
   const queryClient = useQueryClient();
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
+  const [activeColumn, setActiveColumn] = useState<IssueStatus>("TODO");
 
   const { data: projectData } = useQuery<{
     project: { id: string; name: string };
@@ -194,6 +248,30 @@ export default function BoardPage({
     },
     [issuesByStatus]
   );
+
+  function handleMobileStatusChange(issue: Issue, newStatus: IssueStatus) {
+    if (issue.status === newStatus) return;
+    const sourceItems = issuesByStatus[issue.status].filter(
+      (i) => i.id !== issue.id
+    );
+    const targetItems = [
+      ...issuesByStatus[newStatus],
+      { ...issue, status: newStatus },
+    ];
+    const updates = [
+      ...sourceItems.map((item, idx) => ({
+        id: item.id,
+        status: issue.status,
+        kanbanOrder: idx,
+      })),
+      ...targetItems.map((item, idx) => ({
+        id: item.id,
+        status: newStatus,
+        kanbanOrder: idx,
+      })),
+    ];
+    boardMutation.mutate(updates);
+  }
 
   function handleDragStart(event: DragStartEvent) {
     const issue = issues.find((i) => i.id === event.active.id);
@@ -282,34 +360,77 @@ export default function BoardPage({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
           </div>
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCorners}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-4 overflow-x-auto pb-4">
-              {COLUMNS.map((col) => (
-                <KanbanColumn
-                  key={col.id}
-                  column={col}
-                  issues={issuesByStatus[col.id]}
-                  projectKey={projectKey}
-                />
-              ))}
-            </div>
-            <DragOverlay>
-              {activeIssue && (
-                <div className="bg-white p-3 rounded-lg border-2 border-blue-400 shadow-lg w-[260px]">
-                  <p className="text-sm font-medium">{activeIssue.title}</p>
-                  <span className="text-xs text-gray-400">
-                    {projectKey}-{activeIssue.issueNumber}
-                  </span>
+          <>
+            {/* Mobile: status pill selector + single column card list */}
+            <div className="md:hidden space-y-4">
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                {COLUMNS.map((col) => (
+                  <button
+                    key={col.id}
+                    type="button"
+                    onClick={() => setActiveColumn(col.id)}
+                    className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap border transition-colors ${
+                      activeColumn === col.id
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    {col.label} ({issuesByStatus[col.id].length})
+                  </button>
+                ))}
+              </div>
+              {issuesByStatus[activeColumn].length === 0 ? (
+                <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500 text-sm">
+                  이 상태의 이슈가 없습니다.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {issuesByStatus[activeColumn].map((issue) => (
+                    <MobileKanbanCard
+                      key={issue.id}
+                      issue={issue}
+                      projectKey={projectKey}
+                      onStatusChange={handleMobileStatusChange}
+                    />
+                  ))}
                 </div>
               )}
-            </DragOverlay>
-          </DndContext>
+            </div>
+
+            {/* Desktop: DnD kanban */}
+            <div className="hidden md:block">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCorners}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="flex gap-4 overflow-x-auto pb-4">
+                  {COLUMNS.map((col) => (
+                    <KanbanColumn
+                      key={col.id}
+                      column={col}
+                      issues={issuesByStatus[col.id]}
+                      projectKey={projectKey}
+                    />
+                  ))}
+                </div>
+                <DragOverlay>
+                  {activeIssue && (
+                    <div className="bg-white p-3 rounded-lg border-2 border-blue-400 shadow-lg w-[260px]">
+                      <p className="text-sm font-medium">
+                        {activeIssue.title}
+                      </p>
+                      <span className="text-xs text-gray-400">
+                        {projectKey}-{activeIssue.issueNumber}
+                      </span>
+                    </div>
+                  )}
+                </DragOverlay>
+              </DndContext>
+            </div>
+          </>
         )}
       </div>
     </MainLayout>

@@ -840,4 +840,74 @@ return sameBytes && aBuf.length === bBuf.length;
 ### 남겨둔 후속
 - `GITHUB_LINK_TYPE_VALUES`/`_STATUS_VALUES`를 `export`해 폼 select 옵션·zod 스키마 파생 공유 (LOW)
 - `handlePush`의 이슈 조회 N+1(`findUnique` 직렬) — 현재 20 commits/delivery 제한으로 문제 없음 (LOW)
+
+---
+
+## ADR-026: 칸반 보드 모바일 대응 — DnD 대신 상태 pill + 카드 select
+
+**날짜**: 2026-04-22
+**상태**: 채택
+
+### 맥락
+Phase 1~5로 레이아웃 셸·프로젝트 탭·이슈 목록·이슈 상세를 모바일에 적응시켰고 이제 Phase 6로 칸반 보드 차례. 기존 보드는 `@dnd-kit`으로 4컬럼 `flex` 가로 스크롤 + 카드 드래그로 상태/순서 변경. 모바일(< 768px)에서는 다음 문제가 겹친다:
+
+1. **4컬럼 동시 노출 불가**: 컬럼 `min-w-[260px]` 4개면 가로 1040px 이상 필요. 375px 폭에서는 한 번에 한 컬럼만 보이고 좌우 스와이프로 이동해야 하는데, 이미 페이지 자체가 세로 스크롤 대상이라 가로 스와이프가 제스처 충돌을 일으킴
+2. **터치 DnD 불안정**: `@dnd-kit`의 `PointerSensor`는 터치도 받지만 모바일 long-press → 드래그 UX는 실수로 세로 스크롤과 겹쳐 의도치 않은 드래그·취소가 자주 발생. `TouchSensor` 별도 도입 + 활성화 딜레이 튜닝이 필요하며, 이는 기존 DnD 동작과 분기 처리해야 함
+3. **드롭 타겟 가독성**: 좁은 화면에서 드래그 중 다른 컬럼 드롭존이 보이지 않아 사용자는 어디로 옮기는지 감각을 잃음
+
+DnD를 모바일에서 제대로 대응하려면 별도 센서 + 제스처 튜닝 + 시각 개선이 필요한데, 이슈 상태 변경의 **본질 동작**은 "이 이슈를 다른 상태로 옮긴다"이고 드래그는 표현 방식일 뿐이다.
+
+### 결정
+
+**모바일(< 768px)에서는 DnD를 사용하지 않고, 상태 pill 필터 + 카드 내부 상태 `<select>`로 대체한다.**
+
+구체 구현:
+
+1. **렌더 분기는 CSS 기반** — `md:hidden`(모바일) / `hidden md:block`(데스크톱) 두 블록을 모두 마크업하되 현재 뷰포트에만 노출. `useMediaQuery` 같은 JS 기반 분기는 SSR 깜빡임이 있어 배제.
+
+2. **모바일 UI**:
+   - 상단: 4개 상태 pill 버튼(`할 일 (N)` / `진행 중 (N)` / `리뷰 중 (N)` / `완료 (N)`) — `flex gap-2 overflow-x-auto` 가로 스와이프
+   - 본문: 현재 활성 pill에 해당하는 단일 컬럼만 `space-y-2`로 카드 리스트 렌더
+   - 카드: 제목(Link) + `{KEY}-{#}` + `PriorityBadge` + 담당자 + **상태 `<select>`**
+   - 카드 내 `<select>`에서 상태를 바꾸면 기존 `boardMutation`을 재사용해 소스 컬럼 제외 + 타겟 컬럼 끝에 append한 updates 배열을 PATCH
+
+3. **데스크톱 UI**: 기존 `DndContext` + 4컬럼 가로 배치 + `KanbanCard`(DnD) 완전 보존. `hidden md:block` 래퍼로 마크업만 감싸고 로직·시각 회귀 없음.
+
+4. **모바일 카드 순서 변경은 1차 범위 외**: 상태 변경만 지원하고 동일 컬럼 내 순서는 기존 `kanbanOrder` 기준으로 그대로 표시. 모바일에서 순서 조정 UX는 후속(예: 카드 상하 버튼 또는 long-press reorder).
+
+5. **ARIA 선언 미사용**: 상태 pill에 일시적으로 `role="tablist"` + `aria-selected`를 붙였다가, roving tabindex + 화살표 키 핸들러가 빠진 상태로는 ARIA 권고 미완성이라는 Phase 5 일관 판단에 따라 제거. 단순 `<button>` 그룹 + 시각 상태(배경/테두리)로 선택 전달.
+
+### 근거
+
+- **모바일 UX의 본질은 "상태 변경"**: 드래그는 데스크톱에서의 **표현 방식**이고, 모바일에서는 `<select>`가 오히려 더 정확하고 빠르다. 5~20명 소규모 팀의 실사용 통계상 칸반 DnD 주 사용처는 자리에 앉아 PC에서 이슈를 정리하는 매니저/리드다.
+- **`<select>` 네이티브 접근성**: iOS/Android 모두 네이티브 picker UI로 제공되어 키보드/스위치 컨트롤/스크린 리더가 자동 지원. 커스텀 dropdown보다 안정적.
+- **CSS 분기 선택 이유**: `useMediaQuery(min-width: 768px)`를 써서 `isDesktop ? <Dnd/> : <Mobile/>` 식으로 해도 되지만, 초기 렌더 플래시(`false` → `true`)가 발생하고 resize 시 DnDContext 마운트/언마운트가 반복된다. 두 UI 모두 DOM에 두고 `display:none`으로 숨기면 테스트·SEO·리플로우 모두 예측 가능.
+- **DnD 코드 건드리지 않음**: `KanbanCard`/`KanbanColumn`/`handleDragStart/Over/End`/sensors 모두 원본 유지. 회귀 표면 최소화.
+- **ADR-025 일관**: Phase 5의 "미완성 ARIA는 오히려 혼란" 판단과 일치해 role 계열 속성을 남기지 않음.
+
+### 결과
+
+- `src/app/projects/[projectKey]/board/page.tsx`:
+  - `MobileKanbanCard` 컴포넌트 추가(약 45줄) — 제목 Link + PriorityBadge + 상태 select + 담당자
+  - `activeColumn: IssueStatus` state 추가(기본 `"TODO"`)
+  - `handleMobileStatusChange` 함수 추가 — 소스/타겟 컬럼 재계산 후 기존 `boardMutation`에 위임
+  - render: `md:hidden` 모바일 블록(상태 pill + 카드 리스트 or 빈 상태) + `hidden md:block` 데스크톱 DnD 블록
+  - 로딩 스피너는 분기 바깥 공통
+
+- `docs/ADR.md`: 이 ADR-026 추가
+
+- 전역 `@dnd-kit` 동작 불변. 데스크톱 회귀 없음.
+
+### 대안
+
+- **모바일에서도 DnD 유지**: `TouchSensor` 도입 + activation delay 300ms + 가로 스와이프 방지 제스처 튜닝. 장점은 UX 일관성. 단점은 스와이프 충돌 + 커스텀 센서 테스트 커버리지 부담. 5명 팀 규모에서 보상이 낮다고 판단 → 기각.
+- **단일 컬럼 대신 컬럼 accordion**: 모바일에서 4컬럼을 모두 세로로 쌓고 각각 접기/펼치기. 스크롤 길이가 길어지고 컬럼 간 비교가 어려움 → 기각.
+- **`useMediaQuery` 기반 분기 렌더**: 초기 플래시와 DnD 컨텍스트 재마운트. 커스텀 hook으로 `useSyncExternalStore` 패턴을 쓰면 해결되지만 복잡도 증가 → 기각.
+- **모바일에서 보드 자체를 제거하고 이슈 목록으로 유도**: 보드를 "데스크톱 전용 기능"으로 선언. 사용자가 모바일에서 상태 전환을 빠르게 하고 싶은 니즈를 놓침 → 기각.
+
+### 남겨둔 후속
+
+- 모바일 카드 순서 조정(Reorder) 지원 — 카드에 ↑/↓ 버튼 또는 long-press drag. UX 실사용 피드백 후 결정 (LOW)
+- 상태 pill 선택 상태의 접근성 완성 — `role="radiogroup"` + 화살표 키 + roving tabindex 혹은 `role="tablist"` 완전 구현. 접근성 전용 커밋에서 Phase 5 탭 바 문제와 일괄 처리 (MEDIUM)
+- 모바일 카드의 상태 select 변경 시 optimistic UI — 현재는 서버 응답 후 re-fetch. 짧은 지연에서 깜빡임. React Query `onMutate` 패턴으로 개선 (LOW)
 - `PullRequestPayload.pull_request?`로 optional 선언해 런타임 가드와 타입 의도 일치 (정리)
