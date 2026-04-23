@@ -122,7 +122,11 @@ function MobileKanbanCard({
           onChange={(e) =>
             onStatusChange(issue, e.target.value as IssueStatus)
           }
-          className="text-xs border border-gray-300 rounded px-2 py-1 text-gray-700"
+          // iOS Safari는 폼 요소 font-size < 16px일 때 포커스 시 자동 줌인을 트리거하고
+          // 그 과정에서 native 옵션 피커의 위치/스케일이 깨지는 사례가 있음.
+          // inline style로 16px 강제해 자동 줌 방지.
+          className="text-sm border border-gray-300 rounded px-2 py-1.5 text-gray-700"
+          style={{ fontSize: "16px" }}
           aria-label="상태 변경"
         >
           {COLUMNS.map((col) => (
