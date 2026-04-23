@@ -3,6 +3,24 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-23] 3부 — RichEditor 프로덕션 버그 핫픽스 + B안 묶음 4(번다운 가독성) 완료
+
+### Fixed
+- **RichEditor 블록 스타일 복구 (h1/h2/h3/list/blockquote/pre/hr)** — 프로덕션 배포 후 사용자(댓글/답글에서 B/I/S는 동작하나 H1~H3/목록/코드블록/인용 버튼이 시각적으로 무효) 발견한 버그. 원인은 Tailwind v4 Preflight이 `<h1>`/`<ul>`/`<blockquote>` 기본 스타일을 리셋하고, `@tailwindcss/typography` 플러그인 미설치로 `prose`/`prose-sm` 클래스가 아무 CSS도 적용하지 않던 것. 인라인 마크(Bold/Italic/Strike)는 `<strong>`/`<em>`/`<s>` 태그로 Preflight 영향 없어 정상 동작. **해결: `globals.css`에 `.ProseMirror` 영역 한정으로 헤딩/리스트/인용/코드/hr 규칙 직접 정의 (약 77줄).** 플러그인 설치 대안을 피한 이유는 (a) 댓글 카드 같은 좁은 영역에서 `prose` 기본 여백이 과함, (b) 추가 의존성 없이 선택자 scope 명확, (c) 이슈 설명과 댓글 양쪽 모두 같은 규칙으로 일괄 적용 가능. `toggleHeading`/`toggleBulletList` 등 Tiptap 커맨드는 처음부터 정상 작동하고 있었음 — `<h1>` 태그 저장은 되고 있었으나 시각 스타일만 죽어 있었던 것 — `61947a9`
+
+- **번다운 차트 모바일 가독성 (font 10→18, SVG max-w 640px)** — B안(접근성/가독성 커밋) 묶음 4. 모바일 360px 화면에서 SVG text가 `10 × (360/640) ≈ 5.6px`로 렌더돼 판독 불가하던 문제. `viewBox="0 0 640 220"` + `w-full h-auto` 조합은 컨테이너 너비에 따라 선형 스케일 → 작은 화면에서 텍스트도 함께 축소. 해결: (1) fontSize 10→18 (y-tick, x-start, x-end 3곳), (2) SVG에 `max-w-[640px] mx-auto` 추가로 와이드 데스크톱에서 과도한 확대 방지, (3) viewBox height 220→240, padding.left 36→48(3자리 레이블 "100" 수용), padding.bottom 28→32. 모바일 360px: 10.1px / 데스크톱 640px 이상: 18px 고정 — `9bd97d0`
+
+### 배포
+- `61947a9` RichEditor 핫픽스 → `devtracker-p6j3egy21` Ready (53s)
+- `9bd97d0` 번다운 차트 → `devtracker-aafcee7kb` Ready (51s)
+- 모든 커밋 `origin/main` 반영 완료
+
+### 알려진 제한
+- 기존 댓글(2026-04-23 이전 저장분)은 대부분 plain text로 저장돼 있어 `<p>` 태그만 포함. H1/목록 태그 미포함이라 이번 CSS 변경 영향 없음. 이번 배포 이후 새로 작성되는 댓글은 `<h1>`, `<ul>` 등 태그가 제대로 저장되고 시각 스타일도 반영됨
+- BurndownChart는 여전히 스프린트 상세 페이지에서만 사용됨. 다른 차트 컴포넌트 없음
+
+---
+
 ## [2026-04-23] 추가 — sonner 토스트 UI 도입 + 댓글/답글 RichEditor 통일
 
 ### Added
