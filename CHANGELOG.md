@@ -3,6 +3,20 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-23] Vercel ↔ GitHub 자동 배포 재연동 + 토스트 UI 방향 합의
+
+### Changed
+- Vercel 프로젝트 `devtracker`의 GitHub 연결 복구: `vercel git connect https://github.com/withwooyong/devtracker.git` 실행 → `Connected`. 이후 `git push origin main` 시 자동 Production 빌드가 트리거됨. 빈 커밋 `e6dec5c`로 검증 → 자동 배포 `devtracker-39lry4hmy` Ready (57s). 이전과 달리 `vercel --prod --yes` 수동 실행 불필요 — `e6dec5c`
+
+### Fixed
+- Cursor 내장 터미널 Claude Code 세션에서 `git push origin main`이 401로 실패하던 원인 규명 — 전역 `credential.helper`(AWS CodeCommit)가 아니라 Cursor IDE가 주입하는 `GIT_ASKPASS`/`VSCODE_GIT_ASKPASS_*` 환경변수가 `credential.https://github.com.helper`(gh) 체인을 우회하고 askpass IPC로 떨어져 인증 실패. Claude Code 세션 한정 영구 해결은 저장소 외부(`~/.claude/settings.json`)에서 `env`에 askpass 4개 키를 빈 문자열로 override
+- 일회성 우회 경로(앞으로도 필요할 수 있음): `git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin main`
+
+### 배포
+- `21e764f` (이전 커밋) production 상태 유지 중. 금회 `e6dec5c`는 자동 배포 검증용 빈 커밋으로 기능 변경 없음 — 자동 트리거로 `devtracker-39lry4hmy` 생성 및 Ready 확인
+
+---
+
 ## [2026-04-22] 13-3차 ~ 13-7차 — 칸반 보드 안정화 + 대댓글 + UI 정비
 
 ### Added
