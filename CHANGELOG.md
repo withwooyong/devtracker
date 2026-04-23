@@ -3,6 +3,31 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-23] 5부 — shadcn/ui 도입 + 칸반 감성 효과 + 이슈 상세/생성 shadcn 전환
+
+### Added
+- **shadcn/ui 인프라 전면 도입** — Tailwind v4 공식 지원 스택(style: new-york, baseColor: slate). 의존성 추가: `clsx`, `tailwind-merge`, `class-variance-authority`, `@radix-ui/react-slot`, `@radix-ui/react-select`, `@radix-ui/react-avatar`, `@radix-ui/react-separator`, `lucide-react`(1.8.0), `tw-animate-css`. `src/lib/utils.ts`(cn), `components.json` 생성. `globals.css`를 OKLCH 토큰 체계로 전면 재작성(라이트/다크 양쪽, `@theme inline`으로 Tailwind 유틸리티 노출, 다크모드 variant `&:is(.dark *)`). 네이티브 input/textarea/select 기본 스타일은 `:not([data-slot])`로 shadcn 컴포넌트와 분리 — `3423468`
+- **shadcn UI 컴포넌트 10종** — `src/components/ui/`: Button, Card, Badge(slate/blue/amber/emerald/orange/red/purple 커스텀 variants), Skeleton, Avatar, Separator, Select(Radix), Input, Textarea, Label — `3423468`, `6fda696`
+- **칸반 보드 감성 효과 — ambient/tilt/magnetic/skeleton** — 컬럼별 OKLCH 커스텀 토큰(`--kanban-todo/progress/review/done` + glow)으로 radial + linear gradient mesh 배경. 드래그오버 시 `ambient-pulse` 애니메이션 + glow 링. 카드 hover 시 `perspective(900px)` + `rotateX/Y` 최대 5° 3D 틸트 + 자석 3px 변위 + 포인터 스포트라이트(`radial-gradient at var(--pointer-x)`). 로딩 상태는 스피너 → `skeleton-shimmer`(좌→우 하이라이트 keyframe) 보드 전체 플레이스홀더. `prefers-reduced-motion` 환경에서는 모든 모션 비활성 — `3423468`
+- **`src/components/board/use-tilt.ts`** — 포인터 위치 → `--tilt-x/y`, `--mag-x/y`, `--pointer-x/y`, `--tilt-glow` CSS 변수 주입 훅. `requestAnimationFrame` 배칭. DnD 중엔 `active: false`로 비활성. `onPointerLeave`/`onPointerDown`에서 상태 리셋 — `3423468`
+
+### Changed
+- **`src/components/common/status-badge.tsx`** — 하드코딩된 Tailwind 색상 문자열 → shadcn `Badge` + variant 매핑 체계(TODO=slate, IN_PROGRESS=blue, IN_REVIEW=amber, DONE=emerald / LOW=slate, MEDIUM=blue, HIGH=orange, CRITICAL=red / 배포: SUCCESS=emerald, FAILED=red, ROLLED_BACK=amber / 환경: STAGING=purple, PROD=red). 외부 호출부 시그니처 유지 — `3423468`
+- **칸반 보드(`board/page.tsx`)** — 데스크톱/모바일 모두 shadcn 컴포넌트로 교체. 데스크톱 카드는 Card + tilt-card 래퍼(drag 중엔 tilt 끔, DragOverlay에 `rotate-[1.5deg]` + 강한 그림자). 모바일은 네이티브 `<select>` → shadcn Select(컬럼 dot 아이콘), 상태 pill → Button outline/default. 컬럼 dot은 `ring-2 ring-background/80`로 ambient 배경과 대비 확보. 빈 컬럼에는 dashed border "비어 있음" 플레이스홀더 — `3423468`
+- **이슈 생성 페이지(`issues/new/page.tsx`)** — 전체 폼 → `Card` + `CardHeader/CardTitle/CardContent`. `<input>`/`<select>`/`<textarea>` → `Input`/`Select`/`Textarea`, `<label>` → `Label` + `htmlFor` 연결. 버튼 → `Button` variant(ghost/default). 라벨 피커는 색상 값 직접 주입 필요로 커스텀 스타일 유지(토큰만 `border-input`/`text-muted-foreground`로 교체). Radix Select 빈값 제약 대응 → module scope 상수 `UNASSIGNED = "__unassigned__"` 센티넬로 "미지정" 처리, 상태→UI와 UI→API 양방향 변환 — `6fda696`
+- **이슈 상세 페이지(`issues/[issueNumber]/page.tsx`)** — 모든 카드형 `<div className="bg-white p-4 rounded-lg border">` → `Card`/`CardContent`. 편집 모드 `Input`(제목) + `Textarea`(설명). 사이드바 `<select>` 3개(상태/우선순위/담당자) → shadcn `Select`, 메타 정보 구분선 `<div className="pt-2 border-t">` → `Separator`. 댓글/답글/전체 탭 모든 카드를 Card로, 답글은 `bg-muted/40`로 시각적 들여쓰기. 로딩 스피너 → Card + Skeleton 레이아웃 플레이스홀더. 탭 바는 언더라인 스타일 유지(토큰 `border-primary`/`text-foreground`로 전환). 담당자 Select도 동일한 `UNASSIGNED` 센티넬 적용 — `6fda696`
+- **답글 작성 폼 구조 재배치** — 초안에서 `<Card asChild>`로 form을 Card로 변신시키려 했으나 현 Card 구현이 Radix `Slot`을 쓰지 않아 `asChild` 무효(TS 에러 + 런타임은 div로 남음). 코드 리뷰에서 CRITICAL로 걸러 `<form>`을 outer로, `<Card>`를 inner로 재배치(form 기능 + 카드 시각 모두 정상 동작) — `6fda696`
+
+### 배포
+- `3423468` shadcn 도입 + 칸반 감성 효과 → Vercel 자동 배포 트리거
+- `6fda696` 이슈 상세/생성 shadcn 전환 → Vercel 자동 배포 트리거
+- 둘 다 `origin/main` 반영 완료. push는 기록된 회피책(`git -c credential.helper='!gh auth git-credential'`) 사용
+
+### 남은 shadcn 전환 후보 (다음 세션)
+- 대시보드(`src/app/dashboard/page.tsx`), 프로젝트 목록(`src/app/projects/page.tsx`), 프로젝트 메인/설정, 배포/스프린트 관련 페이지, 전역 설정. 토큰 체계가 이미 구축되어 있어 교체는 주로 `bg-white/border-gray-*` → `bg-card/border-border` 치환 + Card/Button 래핑
+
+---
+
 ## [2026-04-23] 4부 — 모바일 칸반 상태 select 피커 핫픽스
 
 ### Fixed

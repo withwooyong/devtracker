@@ -1,37 +1,131 @@
 # Session Handoff
 
-> Last updated: 2026-04-23 (KST, /handoff 4부)
+> Last updated: 2026-04-23 (KST, /handoff 5부)
 > Branch: `main`
-> Latest commit: `043855b` — fix: 모바일 칸반 상태 select 옵션 피커 표시 문제 핫픽스
+> Latest commit: `6fda696` — feat: 이슈 상세/생성/댓글 페이지 shadcn UI 전환
 > Production: https://devtracker-dusky.vercel.app
-> 최신 배포: 자동 트리거 `devtracker-end8fqkrj` Ready (50s, `043855b` 기준)
 
 ## Current Status
 
-**✅ 4부(모바일 칸반 select 핫픽스) 완료.** 3부 배포 후 사용자가 모바일 화면 스크린샷으로 "상태 select를 누르면 옵션 피커가 화면 좌상단에 미니 박스로 렌더되고 글씨 판독 불가"를 제보. 원인 `text-xs`(12px) → iOS Safari 포커스 자동 줌 → native 피커 스케일 틀어짐. 해결: `text-sm` + inline `fontSize: 16px` + padding 살짝 확대(`043855b`). origin 반영 + Vercel 자동 배포 Ready. **사용자 실기 재현 여부 확인 대기 중** (DevTools 에뮬레이터만의 현상일 가능성도 존재). **다음 세션 최우선은 여전히 B안 묶음 2(팝오버 외부 클릭 닫힘)**.
+**✅ 5부(shadcn/ui 도입 + 칸반 감성 효과 + 이슈 상세/생성 shadcn 전환) 완료.** 청크 1 전체 완주. 이제 프로젝트는 shadcn 토큰 체계(OKLCH 기반, 라이트/다크 준비됨) + 칸반 보드에 ambient/tilt/magnetic/skeleton 효과가 살아 있고, 이슈 생성/상세/편집/댓글/답글/사이드바까지 전부 shadcn 컴포넌트로 전환됨. 다크모드 토글 UI만 붙이면 다크도 즉시 동작. **다음 세션 최우선은 남은 페이지들(대시보드/프로젝트 목록/설정/배포/스프린트)의 shadcn 전환** — 토큰은 이미 다 구축돼 있어 bg/border 치환 위주 작업.
 
-## Completed This Session (2026-04-23 4부)
+## Completed This Session (2026-04-23 5부)
 
-| # | Task | Commit |
-|---|------|--------|
-| 1 | 사용자 스크린샷으로 모바일 칸반 상태 select 옵션 피커가 화면 좌상단에 미니 박스로 렌더되는 버그 발견 | — |
-| 2 | 원인 진단: `text-xs`(12px) select → iOS Safari 포커스 자동 줌 트리거 → native 피커 위치/스케일 틀어짐. Android/DevTools 에뮬레이터에도 유사 사례 보고됨 | — |
-| 3 | 핫픽스: `text-xs` → `text-sm` + inline `style={{ fontSize: '16px' }}`(iOS 자동 줌 방지 기준선) + `py-1` → `py-1.5`(터치 타겟 확대) | `043855b` |
-| 4 | Vercel 자동 배포 Ready(`devtracker-end8fqkrj`, 50s) | — |
+| # | Task | Commit | Files |
+|---|------|--------|-------|
+| 1 | 방향 결정: C안(shadcn 전체 도입 + 칸반 효과 + 점진 페이지 전환). 탐색형 질문에 3안 제시 후 사용자가 C 승인 | — | — |
+| 2 | shadcn 의존성 9종 추가(clsx, tailwind-merge, cva, radix-slot/select/avatar/separator, lucide-react, tw-animate-css) | `3423468` | `package.json`, `pnpm-lock.yaml` |
+| 3 | 토큰 인프라 구축: `src/lib/utils.ts`(cn), `components.json`, `globals.css` OKLCH 전면 재작성(라이트/다크 + `@theme inline` + `@custom-variant dark`) + 칸반 커스텀 토큰(`--kanban-*`) + 효과 CSS(ambient-column, tilt-card, skeleton-shimmer, prefers-reduced-motion) | `3423468` | `src/lib/utils.ts`, `components.json`, `src/app/globals.css` |
+| 4 | shadcn UI 컴포넌트 7종 수동 작성: Button/Card/Badge(커스텀 tonal variants)/Skeleton/Avatar/Separator/Select | `3423468` | `src/components/ui/*.tsx` |
+| 5 | `common/status-badge.tsx` → Badge variant 체계로 리팩토링(외부 호출부 시그니처 유지) | `3423468` | `src/components/common/status-badge.tsx` |
+| 6 | `use-tilt.ts` 훅: 포인터 위치 → CSS 변수 주입, RAF 배칭, DnD 중 비활성 | `3423468` | `src/components/board/use-tilt.ts` |
+| 7 | 칸반 보드 전면 리팩토링: ambient gradient mesh + dragover pulse glow + 3D tilt + magnetic + DragOverlay rotate + Skeleton 보드, 모바일 네이티브 select → shadcn Select + 컬럼 dot | `3423468` | `src/app/projects/[projectKey]/board/page.tsx` |
+| 8 | Input/Textarea/Label ui 컴포넌트 추가 | `6fda696` | `src/components/ui/{input,textarea,label}.tsx` |
+| 9 | 이슈 생성 페이지 shadcn 전환: Card + Input + Select + Label htmlFor + Button. Radix Select 빈값 제약 → `UNASSIGNED` 센티넬(module scope) | `6fda696` | `src/app/projects/[projectKey]/issues/new/page.tsx` |
+| 10 | 이슈 상세 페이지 shadcn 전환: 모든 카드형 div → Card, 편집 Input/Textarea, 사이드바 3개 Select + Separator, 로딩 Skeleton 레이아웃, 답글 `bg-muted/40` 들여쓰기 | `6fda696` | `src/app/projects/[projectKey]/issues/[issueNumber]/page.tsx` |
+| 11 | typescript-reviewer 코드 리뷰 → CRITICAL 1건(`<Card asChild>`) 즉시 수정(form outer + Card inner 재배치) | `6fda696` | 동일 |
+| 12 | 빌드 검증 2회(shadcn 도입 후, 이슈 페이지 전환 후) 모두 통과 — TypeScript 2.5~2.6s, 18 페이지 OK | — | — |
 
-## Completed Previous Block (2026-04-23 3부)
+## In Progress / Pending
 
-| # | Task | Commit |
-|---|------|--------|
-| 1 | 프로덕션 버그 진단: 댓글/답글 RichEditor에서 B/I/S만 시각적으로 작동하고 H1-3/`• 목록`/`1. 목록`/`<>`/`❝` 버튼은 무효. 원인은 Tiptap 커맨드가 아니라 **Tailwind v4 Preflight + `@tailwindcss/typography` 플러그인 부재**로 `prose`/`prose-sm` 클래스가 CSS를 주입하지 않던 것 | — |
-| 2 | 해결 결정: 플러그인 설치 대신 `globals.css`에 `.ProseMirror` 영역 한정 CSS 규칙 직접 정의. 댓글 카드 좁은 영역의 `prose` 기본 여백 과함 + 추가 의존성 없이 scope 명확 + 이슈 설명과 댓글 양쪽에 동일 규칙 적용 | `61947a9` |
-| 3 | `globals.css` +77줄: h1(1.5em)/h2(1.3em)/h3(1.1em) 크기·여백, ul disc + ol decimal + padding-left 1.5em, blockquote 왼쪽 3px 보더+이탤릭, pre/code 회색 배경+monospace, hr 1px | `61947a9` |
-| 4 | B안 묶음 4 착수: `burndown-chart.tsx`에서 fontSize 10→18, SVG `max-w-[640px] mx-auto` 추가, viewBox height 220→240, padding.left 36→48(3자리 레이블 수용), padding.bottom 28→32 | `9bd97d0` |
-| 5 | 두 커밋 모두 Vercel 자동 배포 Ready 확인 (`devtracker-p6j3egy21` 53s / `devtracker-aafcee7kb` 51s) | — |
+| # | Task | Status | Notes |
+|---|------|--------|-------|
+| 1 | 남은 페이지 shadcn 전환 (대시보드, 프로젝트 목록/메인/설정, 배포 목록/신규, 스프린트 목록/상세/신규, 전역 설정) | Pending | 토큰 체계 구축됨 → 주로 `bg-white/border-gray-*` → `bg-card/border-border` 치환 + Card/Button 래핑. 각 페이지 10~30분 예상 |
+| 2 | 다크모드 토글 UI | Pending | `globals.css`의 `.dark` 토큰은 준비 완료. 헤더/설정에 토글 버튼만 추가하면 즉시 동작. `next-themes` 도입 고려 |
+| 3 | B안 묶음 2(팝오버 외부 클릭 닫힘) | Pending | 3부 시점부터 남아 있던 과제. shadcn `Popover`(Radix) 사용하면 외부 클릭 닫힘이 기본 지원되므로 이 전환과 함께 해결 가능 |
+| 4 | 모바일 select 옵션 피커 실기 재검증 | Pending | 4부에서 `043855b` 핫픽스 후 사용자 실기 확인 대기. 5부 작업으로 모바일 칸반 select가 shadcn Select(Radix)로 교체되어 native 피커 이슈 자체가 원천 차단됨. 사용자 확인으로 해소 여부 확정 필요 |
+
+## Key Decisions Made
+
+### shadcn/ui 전면 도입 — Tailwind v4 네이티브 경로
+- **범위**: 토큰 체계 + UI 컴포넌트 + 칸반 효과 + 이슈 관련 페이지 전환까지 한 청크로 묶음. 사용자가 "개발 중인 시스템이라 한 번에 가도 괜찮다"고 명시 승인
+- **style 선택**: `new-york` + `baseColor: slate`. OKLCH 기반으로 라이트/다크 대칭. `@theme inline`으로 Tailwind v4 유틸리티에 토큰 노출
+- **수동 작성 채택**: `pnpm dlx shadcn@latest add ...` 대신 공식 소스 기반으로 `src/components/ui/`에 직접 작성. CLI 네트워크 의존 없음 + 컴포넌트 커스터마이즈 용이(예: Badge에 tonal variants slate/blue/amber/emerald/orange/red/purple 추가)
+- **기존 ProseMirror/네이티브 폼 스타일 보존**: shadcn 컴포넌트는 `data-slot` 속성을 항상 붙이므로 `input:not([data-slot])` 선택자로 기존 네이티브 요소와 분리. 기존 RichEditor 규칙과 비shadcn 폼 요소는 영향 없음
+
+### 칸반 감성 효과 — 컬럼 ambient + 카드 tilt/magnetic
+- **Ambient**: CSS 변수(`--column-base`, `--column-glow`)를 인라인 style로 주입 → `.ambient-column::before`의 radial + linear gradient가 컬럼별로 다른 색감. 드래그오버(`data-dragover`)일 때 `::after`로 glow 링 + `ambient-pulse` keyframe 애니메이션
+- **Tilt + Magnetic + Spotlight**: `useTilt` 훅 하나로 4개 효과 CSS 변수(`--tilt-x/y`, `--mag-x/y`, `--pointer-x/y`, `--tilt-glow`)를 일괄 관리. `requestAnimationFrame` 배칭으로 pointermove 쓰로틀링. `active: !isDragging`으로 DnD와 간섭 회피. `onPointerDown`에서도 리셋해 드래그 시작 시 tilt 잔상 제거
+- **Skeleton shimmer**: tw-animate-css의 `animate-pulse` 대신 `background-position` 기반 좌→우 하이라이트 keyframe. Card + Skeleton 조합으로 칸반 보드 전체 레이아웃을 플레이스홀더로 모방
+- **`prefers-reduced-motion` 존중**: 전역 media query에서 tilt/ambient/shimmer 모두 비활성화 (`transform: none !important`)
+
+### Radix Select 빈 문자열 제약 — `UNASSIGNED` 센티넬
+- Radix `SelectItem`은 `value=""`를 허용하지 않음(value를 placeholder/clear 트리거로 예약)
+- **해결**: module scope 상수 `UNASSIGNED = "__unassigned__"` 센티넬 도입. 상태는 계속 `""` 또는 `null`로 유지하고 UI 경계에서만 변환
+  - `value={assigneeId || UNASSIGNED}` (상태→UI)
+  - `onValueChange={v => v === UNASSIGNED ? "" : v}` (UI→상태)
+  - 제출 시 `assigneeId || null` (상태→API)
+- 이슈 생성/상세 두 페이지 모두 동일 패턴 적용. 상태/우선순위는 항상 non-empty 값이므로 센티넬 불필요
+
+### `<Card asChild>` 미지원 — form outer 재배치
+- 초기 구현에서 답글 폼을 `<Card asChild><form>...</form></Card>`로 작성
+- 현 `Card` 컴포넌트는 Radix `Slot`을 사용하지 않고 `<div>`를 고정 렌더 → `asChild`는 TS 에러 + 런타임에선 unknown prop으로 누수
+- **해결**: `<form>`을 outer로, `<Card>`를 inner로 재배치. form 제출 동작 + 카드 시각 모두 정상. 나중에 Card를 Slot 기반으로 확장할지는 케이스 쌓이면 재검토
+- 코드 리뷰에서 CRITICAL로 분류되어 즉시 수정
+
+### 점진 전환 전략 — 청크 1 끝, 나머지 페이지는 다음 세션
+- 토큰이 먼저 바뀌어도 기존 Tailwind 색 유틸리티는 그대로 동작하므로 미전환 페이지도 깨지지 않음
+- 전환 우선순위 제안: 대시보드(노출도) → 프로젝트 목록 → 프로젝트 메인(이슈 목록) → 설정류 → 배포/스프린트. 각각 Card + Button + Select + Input 치환 중심
+
+## Known Issues
+
+### 이번 세션 신규
+- **git push askpass 이슈 재발 패턴** — `~/.claude/settings.json`으로 GIT_ASKPASS 무력화했음에도 첫 시도에서 `fatal: could not read Username for ... Device not configured` 발생. 기록된 회피책(`git -c credential.helper='!gh auth git-credential' push`)으로 해결. memory의 `git_push_credential_helper.md` 절차대로 진행 가능. 영구 수정이 실제로 모든 케이스를 커버하지 못하는지 재점검 필요
+- **lucide-react 1.8.0 버전 특이사항** — 메이저 버전이 예상보다 앞섬(일반적으로 lucide-react는 0.4xx 대). `ChevronDownIcon`/`ChevronUpIcon`/`CheckIcon` named export 모두 존재 확인. 현재는 Select에서만 사용 중이지만 향후 아이콘 추가 시 정식 공식 패키지인지 확인 필요
+
+### 이번 세션과 무관 (기존)
+- 모바일 select 옵션 피커 실기 재검증 (4부부터 이월). 5부 작업으로 자연 해소 가능성 높음
+- `@tailwindcss/typography` 플러그인 부재 — 의도적. RichEditor 블록 스타일이 `globals.css`의 `.ProseMirror` 규칙에 의존. 5부에서도 유지
+- BurndownChart 와이드 데스크톱(2000px+) 640px 캡 — 현재 프로젝트 레이아웃(max-w-6xl 1152px)에서는 무영향
+
+## Context for Next Session
+
+**사용자 원래 의도**: "shadcn 사용하고 있지 않나? 좀더 shadcn 스럽거나 트렐로 스러우면 좋을 것 같은데. ambient, skeleton, tilt, magnetic 효과를 좀 넣어서 동적인 효과도 주면 좋을 것 같아." — 실제로는 shadcn 미설치 상태였음을 확인하고 전체 도입을 제안. A(효과만)/B(shadcn만)/C(둘 다) 3안 제시했고 사용자가 C 선택.
+
+**다음 세션 진입 가이드**:
+1. **남은 페이지 shadcn 전환** — 대시보드부터 시작 권장(사용자가 가장 자주 보는 화면). `bg-white` → `bg-card`, `border-gray-200` → `border-border`, `text-gray-900` → `text-foreground`, `text-gray-500/600` → `text-muted-foreground` 치환이 대부분. 카드형 div는 `Card` + `CardContent`, 버튼은 `Button` + variant, 폼 요소는 `Input`/`Textarea`/`Select`/`Label`
+2. **다크모드 토글** — shadcn 토큰이 준비됨. `next-themes` 1줄 도입 + 헤더에 토글 버튼 하나로 완성. 이슈 상세처럼 label/border 색이 많은 페이지에서 가시 검증 필요
+3. **Popover 교체 시 B안 묶음 2 자연 해결** — shadcn Popover(Radix) 사용하면 외부 클릭 닫힘이 기본 동작. 현재 자체 구현 팝오버가 남아 있는지 grep 필요
+
+**사용자 선호/작업 패턴**:
+- 탐색형 질문("~하면 좋을 것 같은데") → 3안 제시 + 추천 + 트레이드오프 → 사용자 선택 → 착수 패턴 유지
+- /ted-run 파이프라인 애용 (계획서 기반 or 자유 인자 둘 다 수용)
+- 큰 변경은 청크로 쪼개 각 청크마다 빌드 검증 + 코드 리뷰 + 커밋 + 사용자 승인 후 푸시
+- **커밋과 푸시는 별개 명령** — 사용자 명시 요청 시에만 푸시. 한 명령에 묶지 않음(global CLAUDE.md 규칙)
+- 커밋 메시지는 한글
+
+## Files Modified This Session
+
+```
+ components.json                                    |  21 +  (new)
+ package.json                                       |   9 +
+ pnpm-lock.yaml                                     | 668 +
+ src/app/globals.css                                | 327 +/-
+ src/app/projects/[projectKey]/board/page.tsx       | 380 +/-
+ .../[projectKey]/issues/[issueNumber]/page.tsx     | 760 +/-
+ src/app/projects/[projectKey]/issues/new/page.tsx  | 329 +/-
+ src/components/board/use-tilt.ts                   |  61 +  (new)
+ src/components/common/status-badge.tsx             |  73 +/-
+ src/components/ui/avatar.tsx                       |  53 +  (new)
+ src/components/ui/badge.tsx                        |  59 +  (new)
+ src/components/ui/button.tsx                       |  58 +  (new)
+ src/components/ui/card.tsx                         |  92 +  (new)
+ src/components/ui/input.tsx                        |  21 +  (new)
+ src/components/ui/label.tsx                        |  19 +  (new)
+ src/components/ui/select.tsx                       | 185 +  (new)
+ src/components/ui/separator.tsx                    |  28 +  (new)
+ src/components/ui/skeleton.tsx                     |  15 +  (new)
+ src/components/ui/textarea.tsx                     |  21 +  (new)
+ src/lib/utils.ts                                   |   6 +  (new)
+ CHANGELOG.md / HANDOFF.md / docs/ADR.md            | (this /handoff)
+```
 
 ## Recent Commits
 
 ```
+6fda696  feat: 이슈 상세/생성/댓글 페이지 shadcn UI 전환
+3423468  feat: shadcn 도입 + 칸반 보드 ambient/tilt/magnetic/skeleton 효과
+3306cff  docs: /handoff 2026-04-23 4부 — 모바일 select 핫픽스 기록
 043855b  fix: 모바일 칸반 상태 select 옵션 피커 표시 문제 핫픽스
 609a687  docs: /handoff 2026-04-23 3부 — RichEditor 핫픽스 + B안 묶음 4 번다운 가독성
 9bd97d0  fix: 번다운 차트 모바일 가독성 (font 10→18, max-w 640px)
@@ -39,181 +133,10 @@
 31e4d17  docs: /handoff 2026-04-23 2부 — sonner 토스트 + 댓글 RichEditor 통일
 58f3949  feat: 댓글/답글 입력·렌더를 RichEditor로 통일
 2204a35  feat: 핵심 mutation onSuccess에 성공 토스트 추가
-82e15ea  chore: 토스트 위치를 상단 중앙(top-center)으로 변경
-0ecb150  test(e2e): sonner 토스트 검증 스펙 추가
-d5e1815  feat: 핵심 mutation onError를 sonner 토스트로 배선
-e74dc68  feat: sonner 도입 + Providers에 Toaster 마운트
-534a485  docs: /handoff 2026-04-23 — Vercel ↔ GitHub 재연동 + Cursor askpass 영구 해결
 ```
 
-## Key Decisions
+## Production Deployment
 
-### RichEditor 블록 스타일 — `.ProseMirror` 직접 CSS (플러그인 대안 비채택)
-- **Tailwind v4 Preflight이 의도 이상으로 공격적**: `<h1>`, `<h2>`, `<h3>`, `<ul>`, `<ol>`, `<li>`, `<blockquote>` 기본 브라우저 스타일을 전부 리셋 (font-size inherit, list-style none 등)
-- **`@tailwindcss/typography` 플러그인 설치는 비채택**: (a) 플러그인의 `prose` 기본 여백(`p` 위아래 1.25em)이 댓글 카드 좁은 영역에 과함, (b) `prose-p:my-1 prose-h1:text-base` 등 override modifier가 많아지면 디자인 분산, (c) 추가 의존성 관리 부담
-- **채택: `.ProseMirror` 선택자 한정 CSS 77줄** — 이슈 설명 + 댓글 + 답글 뷰어/편집 4군데 동일하게 적용 (`RichEditor` 컴포넌트가 항상 `.ProseMirror` 클래스를 붙이기 때문). 선택자 scope 명확해 전역 오염 없음
-- **인라인 마크(B/I/S)는 영향 없었던 이유**: `<strong>`/`<em>`/`<s>`는 Preflight이 font-weight/font-style/text-decoration만 건드리지 않음. 그래서 버그 재현 시 "어떤 버튼은 되는데 어떤 건 안 된다"는 혼동 패턴이 생김
-
-### BurndownChart 모바일 가독성 — fontSize 상향 + SVG `max-w-[640px]`
-- SVG `viewBox` + `w-full h-auto` 조합은 선형 스케일이라 모바일 360px에서 텍스트가 5.6px까지 축소됨
-- 대응 옵션:
-  - JS ResizeObserver로 컨테이너 크기 측정 후 fontSize 동적 조정 → 복잡도 ↑
-  - CSS media query로 SVG `font-size` 분기 → SVG text는 viewBox 단위 해석이라 기대대로 안 먹음
-  - **채택: fontSize 상수 상향(10→18) + SVG max-width로 upper bound** → 간단하고 예측 가능
-- 효과: 모바일 360px 10.1px / 데스크톱 640px 이상 18px 고정 (좁아지는 태블릿 구간은 선형)
-
-### /handoff 분할 전략
-- 같은 하루(2026-04-23) 안에 3부에 걸친 /handoff 실행. 자연 작업 구간마다 /handoff를 찍는 방식 유지 — PC 크래시 이력(3회) 고려한 방어 저장 + 다음 세션 진입 시 최신 맥락 보존
-
-## Known Issues
-
-### 이번 세션 신규 (참고용 — 대부분 해소됨)
-
-- **모바일 select 옵션 피커 이슈가 실기에서도 재발하는지 미확인** — 4부 핫픽스 후 사용자 재검증 대기. 실기에서도 재발하면 **B안 묶음 1(ARIA 탭 + 커스텀 드롭다운)에 "native select → 커스텀 드롭다운 교체"를 묶어서 처리** 고려. `text-xs` 외에도 기타 모바일 폼 요소에 12~14px가 남아 있는지 점검 필요
-- **`@tailwindcss/typography` 플러그인 부재** — 의도적. RichEditor 블록 스타일이 `globals.css`의 `.ProseMirror` 규칙에 의존. 향후 다른 `prose` 사용처가 생기면 plugin 설치 재검토 필요
-- **BurndownChart 와이드 데스크톱(2000px+)에서 차트가 640px에 캡** — `mx-auto`로 중앙 정렬되나 빈 좌우 여백이 눈에 띌 수 있음. 현 프로젝트 레이아웃(max-w-6xl 1152px)에서는 무영향
-
-### 기존 이슈 (유지)
-
-- **Tiptap viewer 인스턴스 churn** (2부에서 기록) — 댓글 30개 탭 전환 시 인스턴스 재생성. 5~20명 팀 무영향
-- **`RichEditor` `autoFocus` prop 부재** (2부) — 답글 버튼 클릭 후 자동 포커스 안 됨
-- **`toast.spec.ts` 미실행** (2부) — CI 또는 분리 환경에서 실행 필요
-- **이슈 상세 편집 모드는 여전히 `<textarea>` 사용** — new 경로(RichEditor)와 불일치. HTML 원본 raw 편집
-- **모바일 댓글 들여쓰기 `ml-10` 과다** — 좁은 화면에서 답글 영역 압박. `ml-6 md:ml-10` 조정 여지
-- **다른 페이지 아바타 `UserAvatar` 미적용** — 사이드바/헤더/notification-dropdown 등 일괄 교체 여지
-- **탭 터치 타겟 `py-2` 미적용** — B안 묶음 1에서 일괄 처리 예정
-- **ARIA tablist/radiogroup 완전 구현 미실시** — roving tabindex + 화살표 키 (B안 묶음 1)
-- **저장된 필터 팝오버 외부 클릭 닫힘 미구현** — B안 묶음 2 (다음 세션 우선)
-- **DnD 훅 비가시 트리 마운트**: `hidden md:block` 안에서도 `useSortable` 실행. 현 규모 무영향
-- **모바일 칸반 카드 순서 조정 미지원** (ADR-026 후속)
-- **모바일 상태 select optimistic UI 없음** (데스크톱 DnD는 13-3차 해결)
-- **`label.color` hex 무검증 `style` 인라인** / **`JSON.parse(f.filters)` try-catch 누락**
-- **이슈 상세 `data!.issue.id` non-null** / **`commentMutation`의 `data?.issue?.id`**
-- **`commentMutation.onError` 없음** — 2부에서 onSuccess 토스트만 추가. 실패 시 조용히 무시됨
-- **deployments fetch `r.ok` 체크 누락** / **`environment` 타입 `string`** (`DeployEnvironment` 아님)
-- **`window.confirm()` 사용** — iOS WKWebView 차단 가능 (B안 묶음 3)
-- **BurndownChart의 `new Date(startDate)` 타임존 불일치** — UTC 파싱 + 로컬 `getMonth/getDate`로 formatShort. UTC+9 환경에서 경계 케이스 가능
-- **DONE 상태이나 `completedAt` null일 때 `updatedAt` fallback** — 완료일보다 이전/이후일 수 있음
-- **e2e 선택자 견고성** — `data-testid` 부여 권장
-- **기존**: Outbox inline drain fire-and-forget, 첨부 Vercel 함수 경유, Prisma CLI `libsql://` 미지원, JWT role DB 미동기, 프로젝트 멤버십 미검증, 관리자용 사용자 매핑 화면 없음, push 이벤트 rate limit 없음
-- **기존 Stash**: `stash@{0}` WIP on `75e6aa5` — 무관
-
-## Pending Improvements
-
-### B안 (접근성/가독성 커밋) 진행 상황
-
-- [x] ~~묶음 4. BurndownChart 모바일 가독성~~ (`9bd97d0`)
-- [ ] **묶음 2. 팝오버 외부 클릭 닫힘** — 다음 세션 최우선. `useClickOutside` 훅 신설 + 저장된 필터 팝오버에 적용. 범위 작음, 리스크 낮음
-- [ ] **묶음 1. ARIA 탭 + roving tabindex** — `ProjectTabs` 공통 + 이슈 상세 탭. `role="tablist"`, `aria-selected`, `tabIndex` 관리, 키보드 ← → 화살표 이동. 범위 중간, 공통 컴포넌트 수정이라 전용 세션 권장
-- [ ] **묶음 3. `window.confirm()` 교체** — 다이얼로그 컴포넌트(Radix Dialog 또는 커스텀) 신설 + 이슈/프로젝트/스프린트/댓글 삭제 플로우 일괄 교체. 범위 큼, iOS WKWebView 차단 해소. 전용 세션 권장
-
-### 그 외
-
-- [ ] **RichEditor `autoFocus` prop 확장** — 답글/인라인 에디터 UX
-- [ ] **`commentMutation.onError` 토스트 추가** — 2부 deferred
-- [ ] **toast.spec.ts 실행 검증** — CI 혹은 분리 환경
-- [ ] **이슈 상세 편집 모드 RichEditor 전환** — 현재 textarea로 HTML raw 편집
-- [ ] **다른 페이지 아바타 `UserAvatar` 교체** — 사이드바/헤더/기타 페이지 확장
-- [ ] **모바일 답글 들여쓰기 조정** (`ml-6 md:ml-10`)
-- [ ] Rate limiting (알림/첨부/webhook) — Upstash Redis
-- [ ] Slack/Discord 외부 알림 통합 — Outbox 확장
-- [ ] 설정 페이지 2차 — name 편집, 삭제 영역 분리, 관리자용 사용자 매핑 화면
-- [ ] Webhook secret 로테이션 감사 로그
-- [ ] Orphan blob cleanup 배치
-- [ ] push 이벤트 rate limit
-- [ ] `handlePush` 이슈 조회 N+1 개선
-- [ ] `GITHUB_LINK_TYPE_VALUES`/`_STATUS_VALUES` export
-- [ ] 이슈 상세 `data!` non-null 제거, `commentMutation` `issue.id` 직접 사용
-- [ ] deployments fetch `r.ok` + `environment` 타입 `DeployEnvironment`
-- [ ] BurndownChart 타임존 불일치 (`startDate` UTC vs `today` 로컬)
-- [ ] e2e `data-testid` 부여
-- [x] ~~모바일 칸반 상태 select 옵션 피커 핫픽스 (text-xs → text-sm + fontSize 16px)~~ (`043855b`)
-- [x] ~~RichEditor 블록 스타일 복구 (Tailwind v4 Preflight 대응)~~ (`61947a9`)
-- [x] ~~A. 성공 토스트 추가~~ (`2204a35`)
-- [x] ~~C. 댓글/답글 RichEditor 적용~~ (`58f3949`)
-- [x] ~~토스트 UI (sonner) 도입~~ (`e74dc68`, `d5e1815`, `82e15ea`)
-- [x] ~~Vercel ↔ GitHub 자동 배포 재연동~~ (`e6dec5c`)
-- [x] ~~GitHub 연동 스토리~~
-- [x] ~~기술 부채 정리 묶음~~ (ADR-025)
-- [x] ~~모바일 반응형 9 Phase~~ (ADR-026)
-- [x] ~~칸반 드래그 500 진짜 수정~~ (`8a1cc2b`, ADR-027)
-- [x] ~~칸반 보드 반응속도/비용 튜닝~~ (`e47d976`)
-- [x] ~~칸반 같은 컬럼 내 카드 순서 변경~~ (`088e565`)
-- [x] ~~이슈 설명 에디터 가독성 + 상세 HTML 렌더~~ (`ce3eaf4`)
-- [x] ~~댓글 대댓글 1-depth 구조~~ (`60a2e40`, ADR-028)
-- [x] ~~이슈 상세 아바타 구분 + 페이지 가독성~~ (`5dc4c98`)
-- [x] ~~seed/테스트 안내 "Ted" 하드코딩 정리~~ (`21e764f`)
-
-## Context for Next Session
-
-- **사용자 원본 의도 (이번 세션 4부)**: 3부 배포 후 모바일 칸반 스크린샷으로 select 옵션 피커 렌더 버그 제보 → 핫픽스(`043855b`) 후 /handoff 4부 마감. 실기 재검증 결과 대기 중
-- **사용자 원본 의도 (3부)**: 2부 배포 직후 프로덕션에서 RichEditor 블록 스타일 깨짐을 스크린샷으로 제보. 핫픽스 후 B안 4개 하위 묶음 중 **묶음 4(BurndownChart)부터 /ted-run으로 처리**하기로 합의하고 실행. 모두 완료 후 /handoff로 3부 마감
-- **다음 세션 최우선: B안 묶음 2 (팝오버 외부 클릭 닫힘)**
-  - 범위: (a) 공용 `useClickOutside(ref, onOutside)` 훅 신설 — `useEffect`에서 document mousedown 리스너 등록, ref 외부 클릭 시 콜백 (b) 저장된 필터 팝오버에 적용 (필터 바에서 사용)
-  - 난이도 낮음, 리스크 낮음, 1커밋으로 충분
-  - 향후 다른 팝오버(드롭다운 메뉴 등)에도 재사용 가능
-  - 예상 파일: `src/hooks/useClickOutside.ts` 신설 + 필터 팝오버 사용처 수정
-- **이어 묶음 1(ARIA 탭) 또는 묶음 3(confirm 교체)**: 각각 전용 세션 권장
-- **RichEditor 블록 스타일 교훈**: Tailwind v4 + Typography 플러그인 관계를 다음 세션이 바로 기억해야 함 — `prose` 클래스 보이면 "플러그인 필요 혹은 직접 CSS 정의 중 하나"라고 체크. 본 프로젝트는 **직접 CSS 정의** 방식 선택(globals.css `.ProseMirror` 블록)
-- **환경 상태**:
-  - `~/.claude/settings.json`의 `GIT_ASKPASS` 빈 값 override는 계속 적용됨. 이 세션에서도 새 세션 시작 시 `echo $GIT_ASKPASS`가 빈 문자열로 확인됨
-  - gh credential helper 자동 호출은 여전히 불안정 → `git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin main` 우회가 안정적 경로. **매번 이 형태로 push 중**
-  - **PC 크래시 3회 이력**: `pnpm dev` + Playwright 동시 기동 회피 지속. 검증은 `pnpm build` 정적 + Vercel 원격 빌드 + 프로덕션 URL 수동 확인 조합
-- **사용자(허우용=Ted) 선호**: /ted-run 파이프라인. **push·프로덕션 배포는 명시 요청 시에만** (글로벌 CLAUDE.md). 커밋 메시지 한글. 비가역 작업(Turso 스키마 변경 등)은 사전 승인
-- **푸시 상태**: 모든 커밋 `origin/main` 반영 완료 (`043855b`까지)
-- **Co-Authored-By**: 프로젝트 `.claude/settings.local.json`에서 `includeCoAuthoredBy: true`
-- Production URL: https://devtracker-dusky.vercel.app
-- Turso DB: `libsql://devtracker-withwooyong.aws-ap-northeast-1.turso.io`
-- GitHub: `withwooyong/devtracker` (Vercel 자동 배포 연결됨)
-- ADMIN: `withwooyong@yanadoocorp.com` / `yanadoo123` (name: 허우용)
-- 작업계획서: `docs/plan/mobile-responsive-plan.md`(9 Phase 완료)
-- Obsidian 심볼릭 링크: `Obsidian Vault/Ted/devtracker` → `devtracker/docs/`
-
-## Environment Variables (Production)
-
-- `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` — Turso 연결
-- `JWT_SECRET`, `JWT_REFRESH_SECRET` — 토큰 서명
-- `BLOB_READ_WRITE_TOKEN` — Vercel Blob Private store
-- `GITHUB_WEBHOOK_SECRET` — GitHub webhook 전역 fallback secret
-- `CRON_SECRET` — Vercel Cron Bearer 인증
-
-## Runbook
-
-- **스키마 변경**: 1) Turso에 `ALTER TABLE ...` 수기 실행(FK 절은 SQLite ALTER 미지원, nullable 컬럼 + 인덱스 분리) 2) `schema.prisma` 수정 3) `npx prisma db push --url "file:./prisma/dev.db"` 4) `npx prisma generate`
-- **Turso 쿼리**: `turso db shell devtracker "<SQL>"` (ADMIN은 homebrew `turso` CLI 로컬 설치)
-- **로컬 env 동기화**: `vercel env pull .env.local --yes`
-- **E2E 전체**: `pnpm dev &` 후 `npx playwright test` (양쪽 프로젝트 chromium + mobile-chrome) — ⚠️ PC 부담 주의, 크래시 3회 이력
-- **E2E 모바일만**: `npx playwright test --project=mobile-chrome`
-- **E2E 데스크톱 회귀**: `npx playwright test --project=chromium`
-- **Vercel 자동 배포**: `git push origin main` — GitHub 연결됨. 수동 `vercel --prod --yes` 불필요
-- **Vercel 수동 재배포** (자동 트리거 실패 시 fallback): `vercel --prod --yes`
-- **Vercel 로그 조회 (과거)**: `vercel logs https://devtracker-dusky.vercel.app --no-follow --since=30m --status-code=500 --expand`
-- **Vercel 로그 조회 (실시간 스트림)**: `vercel logs https://devtracker-dusky.vercel.app` (5분 후 자동 종료)
-- **Vercel 배포 완료 폴링**: `until vercel ls devtracker 2>&1 | sed -n '4p' | grep -qE "Ready|Error"; do sleep 10; done && vercel ls devtracker | sed -n '1,5p'`
-- **Webhook 이벤트 구독**: GitHub repo → Settings → Webhooks → `Pushes`, `Pull requests`
-- **프로젝트 webhook 레포 연결**: `/projects/[key]/settings` → "GitHub 레포지토리" `owner/repo`
-- **프로젝트별 webhook secret**: 같은 페이지 "Webhook Secret" 16자 이상
-- **본인 GitHub 계정 연결**: 사이드바 "내 프로필" → GitHub 로그인
-- **커밋 메시지에 이슈 링크**: `DEV-123` 형식. push는 링크만, PR merge는 이슈 DONE
-- **Outbox 수동 드레인**: `curl -H "Authorization: Bearer $CRON_SECRET" https://devtracker-dusky.vercel.app/api/cron/notifications/drain`
-- **Claude Code 개인 설정**: `.claude/settings.local.json`(gitignored)
-- **Cursor 터미널 push (고정 패턴)**: `git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin main` — gh helper 자동 호출이 환경에서 간헐적으로 실패해 이 우회 명령이 항상 안정적
-- **모바일 수동 확인**: iPhone SE 375×667 / Galaxy 360×780 / iPad 768 / 데스크톱 1440
-- **RichEditor 블록 스타일 디버깅**: `prose`/`prose-sm` 클래스가 보이면 먼저 `@tailwindcss/typography` 플러그인 설치 여부 확인. 현 프로젝트는 미설치 + `globals.css`의 `.ProseMirror` 규칙으로 대체
-- **토스트 검증 (수동)**: 프로덕션 `/login` → `/settings` → DevTools Network 탭에서 저장 요청 실패 유도(offline 체크) → 상단 중앙 빨간 토스트 확인
-- **번다운 차트 가독성 기준**: 모바일 360px에서 fontSize 18 × 0.5625 ≈ 10.1px 달성. 이보다 작은 화면은 현재 대응 범위 외
-
-## Files Modified This Session (4부)
-
-```
-src/app/projects/[projectKey]/board/page.tsx  | +5/-1  MobileKanbanCard select: text-xs→text-sm + fontSize 16px + py-1→1.5
-CHANGELOG.md                                  | +15    4부 섹션 prepend
-HANDOFF.md                                    | 부분 개정 (4부 블록 추가, 나머지 3부 구조 유지)
-```
-
-## Files Modified Previous Block (3부)
-
-```
-src/app/globals.css                          | +77  .ProseMirror 블록 스타일 규칙 (h1-3/list/blockquote/pre/code/hr)
-src/components/common/burndown-chart.tsx     | ±21  fontSize 10→18, max-w 640px, padding 조정
-```
+- `3423468` → Vercel 자동 배포 트리거(push 시점에 Vercel ↔ GitHub 자동 연동 동작)
+- `6fda696` → Vercel 자동 배포 트리거
+- 프로덕션 URL: https://devtracker-dusky.vercel.app

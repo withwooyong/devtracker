@@ -1021,3 +1021,59 @@ await prisma.$executeRaw`
 
 - 모바일 들여쓰기 `ml-10` 과다 — 좁은 화면 대응(`ml-6 md:ml-10`) (LOW)
 - 댓글/답글 입력도 RichEditor로 교체 — 설명과 일관성 (MEDIUM)
+
+---
+
+## ADR-029: shadcn/ui 전면 도입 (Tailwind v4 네이티브) + 칸반 보드 모션 레이어
+
+**날짜**: 2026-04-23
+**상태**: 채택
+
+### 맥락
+UI는 Tailwind v4만으로 조합해 오다 5부 시점에 "더 shadcn스럽거나 트렐로 스럽게 + ambient/tilt/magnetic/skeleton 효과" 요청이 들어옴. 실제 상태를 점검하니 `src/components/ui/` 디렉토리는 비어 있었고 shadcn은 **미설치**였음. 하드코딩된 `bg-white`/`border-gray-*`/`text-gray-900` 반복, `<input>`/`<select>`/`<button>` 네이티브 요소 분산, 로딩은 스피너 하나로 통일된 상태. 토큰 체계를 세우지 않으면 다크모드나 테마 변경이 전역 검색-치환 노동이 됨.
+
+### 결정
+
+**shadcn/ui를 Tailwind v4 네이티브 방식으로 전면 도입하고, 칸반 보드에 모션 레이어(ambient/tilt/magnetic/skeleton)를 얹는다.**
+
+구체:
+- style: `new-york`, baseColor: `slate`, OKLCH 토큰. `@theme inline`으로 Tailwind v4 유틸리티에 노출, `@custom-variant dark (&:is(.dark *))`로 다크모드 variant 선언
+- `src/components/ui/` 10종 수동 작성(CLI 대신): Button/Card/Badge(+ custom tonal variants)/Skeleton/Avatar/Separator/Select/Input/Textarea/Label
+- 커스텀 칸반 토큰 `--kanban-{todo,progress,review,done}(-glow)` + 글로벌 CSS 유틸리티 `.ambient-column` / `.tilt-card` / `.skeleton-shimmer`
+- `useTilt` 훅 하나로 tilt/magnetic/spotlight 4개 CSS 변수 배칭 관리(RAF 쓰로틀, DnD 중 비활성)
+- 네이티브 요소 보존: `input:not([data-slot])` 선택자로 shadcn과 분리 → 기존 RichEditor, 비shadcn 폼 영향 없음
+- Radix Select 빈 문자열 제약은 module scope 상수 `UNASSIGNED = "__unassigned__"` 센티넬로 경계 변환
+
+### 근거
+
+- **Tailwind v4 공식 지원**: shadcn이 2025년부터 Tailwind v4를 정식 지원. canary 불필요, `@theme inline` 한 번이면 끝
+- **slate + new-york**: 프로젝트 톤이 엔터프라이즈형 업무 도구라 컬러풀(zinc/stone 과감함)보다 중립 slate가 맞음. new-york은 border/shadow 조합이 더 정돈됨
+- **수동 작성 채택**: CLI(`pnpm dlx shadcn add`)는 네트워크 의존 + 자동 포맷이라 주석·variant 커스터마이즈가 덮일 수 있음. 컴포넌트 10종은 공식 소스 복붙 범위
+- **Badge tonal variants 커스텀**: 기존 `status-badge.tsx`가 `bg-blue-100 text-blue-700` 류 6가지 조합을 반복 → Badge 컴포넌트에 `slate/blue/amber/emerald/orange/red/purple` variant를 직접 추가해 한 번에 흡수. 외부 호출부 `<StatusBadge>` 시그니처 유지
+- **효과 레이어를 훅 하나로**: tilt/magnetic/spotlight가 각각 다른 CSS 변수를 쓰지만 소스는 동일한 pointermove → `useTilt` 하나에서 4개 변수를 같이 내보내는 게 상태 관리 단순. `prefers-reduced-motion`도 CSS 한 곳에서 제어
+- **청크 1 전환 범위 제한**: 토큰 + UI 컴포넌트 + 칸반 + 이슈 생성/상세까지. 대시보드/프로젝트/배포/스프린트는 미전환 유지 → 토큰이 바뀌어도 기존 `bg-white` 유틸리티는 계속 동작하므로 미전환 페이지 깨지지 않음
+
+### 대안
+
+- **A안(효과만)**: shadcn 없이 칸반에만 ambient/tilt/magnetic CSS 얹기. 1~2시간. 즉시 효능감 크지만 토큰이 분산된 상태 유지 → 다크모드/테마가 여전히 막힘 → 사용자 승인으로 기각
+- **B안(shadcn만)**: 칸반 효과 없이 토큰/컴포넌트 전환만. 페이지 전환 리스크는 낮지만 사용자가 원한 "동적 효과"를 채우지 못함 → 기각
+- **`@tailwindcss/typography` 플러그인 재검토**: 여전히 비채택. RichEditor는 `.ProseMirror` 규칙이 있고, shadcn 토큰이 생겼다고 plugin 필요성이 생기진 않음
+- **`<Card>`에 Radix `Slot`(`asChild`) 지원 추가**: 처음 답글 폼에서 `<Card asChild><form>`으로 쓰려다 현 Card 구현이 Slot을 안 쓰는 것을 발견. CRITICAL로 식별 후 form outer 재배치로 해결. Slot 확장은 실제 반복 케이스가 쌓이면 재검토
+
+### 결과
+
+- `components.json`, `src/lib/utils.ts`, `src/app/globals.css` 전면 재작성
+- `src/components/ui/*.tsx` 10종 신규
+- `src/components/board/use-tilt.ts` 신규
+- `src/components/common/status-badge.tsx`는 Badge variant 체계로 교체
+- 칸반 보드(`board/page.tsx`) 데스크톱/모바일 전부 전환: ambient + tilt/magnetic + DragOverlay rotate + Skeleton 보드 + 모바일 shadcn Select
+- 이슈 생성(`issues/new/page.tsx`) 전면 전환: Card + Input + Select + Label htmlFor + Button, `UNASSIGNED` 센티넬
+- 이슈 상세(`issues/[issueNumber]/page.tsx`) 전면 전환: 모든 카드 Card, 편집 Input/Textarea, 사이드바 Select + Separator, 답글 폼 `<form>` outer 재배치, 로딩 Skeleton 레이아웃
+- 커밋 `3423468` + `6fda696`. 빌드 검증 2회 통과(TS 2.5~2.6s, 18 페이지)
+
+### 남겨둔 후속
+
+- 대시보드/프로젝트 목록/프로젝트 메인/설정/배포/스프린트/전역 설정 페이지 shadcn 전환 (MEDIUM) — 각 10~30분 예상
+- 다크모드 토글 UI (`next-themes` 도입 + 헤더 토글) (MEDIUM) — 토큰은 준비 완료
+- 자체 구현 팝오버/드롭다운이 남아 있는지 grep 후 shadcn `Popover`/`DropdownMenu`로 교체 — B안 묶음 2(외부 클릭 닫힘) 자연 해소 (MEDIUM)
+- lucide-react 1.8.0 버전 출처 재확인 — 메이저 버전이 이례적으로 앞섬. named export는 정상이나 공식 패키지인지 점검 (LOW)
