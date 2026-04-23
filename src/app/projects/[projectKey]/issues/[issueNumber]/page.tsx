@@ -16,6 +16,17 @@ import type { Activity } from "@/types/activity";
 
 type TabKey = "comments" | "activities" | "all";
 
+// Tiptap 빈 에디터는 "<p></p>"를 getHTML()로 반환한다. 태그를 걷어낸 텍스트가
+// 비어 있으면 사용자가 실제로 입력한 게 없는 것으로 취급한다.
+// &nbsp;(U+00A0)는 trim()이 제거하지 않으므로 공백으로 치환 후 판정한다.
+function isHtmlEmpty(html: string): boolean {
+  if (!html) return true;
+  return html
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .trim().length === 0;
+}
+
 export default function IssueDetailPage({
   params,
 }: {
@@ -308,17 +319,22 @@ export default function IssueDetailPage({
                                 {new Date(c.createdAt).toLocaleString("ko-KR")}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
-                              {c.content}
-                            </p>
+                            <div className="text-sm text-gray-800 break-words">
+                              <RichEditor
+                                content={c.content}
+                                editable={false}
+                              />
+                            </div>
                             <div className="mt-2">
                               <button
                                 type="button"
-                                onClick={() =>
+                                onClick={() => {
                                   setReplyingTo(
                                     replyingTo === c.id ? null : c.id
-                                  )
-                                }
+                                  );
+                                  // 다른 답글 폼 내용이 새로 여는 폼에 새어 들어오는 걸 막는다.
+                                  setReplyContent("");
+                                }}
                                 className="text-xs text-gray-600 hover:text-blue-600"
                               >
                                 {replyingTo === c.id ? "답글 취소" : "답글"}
@@ -348,9 +364,12 @@ export default function IssueDetailPage({
                                       )}
                                     </span>
                                   </div>
-                                  <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
-                                    {r.content}
-                                  </p>
+                                  <div className="text-sm text-gray-800 break-words">
+                                    <RichEditor
+                                      content={r.content}
+                                      editable={false}
+                                    />
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -360,7 +379,7 @@ export default function IssueDetailPage({
                             <form
                               onSubmit={(e) => {
                                 e.preventDefault();
-                                if (replyContent.trim()) {
+                                if (!isHtmlEmpty(replyContent)) {
                                   commentMutation.mutate({
                                     content: replyContent,
                                     parentId: c.id,
@@ -369,14 +388,10 @@ export default function IssueDetailPage({
                               }}
                               className="ml-10 bg-white p-3 rounded-lg border"
                             >
-                              <textarea
-                                value={replyContent}
-                                onChange={(e) =>
-                                  setReplyContent(e.target.value)
-                                }
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors h-20"
+                              <RichEditor
+                                content={replyContent}
+                                onChange={setReplyContent}
                                 placeholder="답글을 입력하세요..."
-                                autoFocus
                               />
                               <div className="flex justify-end gap-2 mt-2">
                                 <button
@@ -393,7 +408,7 @@ export default function IssueDetailPage({
                                   type="submit"
                                   disabled={
                                     commentMutation.isPending ||
-                                    !replyContent.trim()
+                                    isHtmlEmpty(replyContent)
                                   }
                                   className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
                                 >
@@ -410,22 +425,23 @@ export default function IssueDetailPage({
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
-                      if (comment.trim()) {
+                      if (!isHtmlEmpty(comment)) {
                         commentMutation.mutate({ content: comment });
                       }
                     }}
                     className="bg-white p-4 rounded-lg border"
                   >
-                    <textarea
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors h-24"
+                    <RichEditor
+                      content={comment}
+                      onChange={setComment}
                       placeholder="댓글을 입력하세요..."
                     />
                     <div className="flex justify-end mt-2">
                       <button
                         type="submit"
-                        disabled={commentMutation.isPending || !comment.trim()}
+                        disabled={
+                          commentMutation.isPending || isHtmlEmpty(comment)
+                        }
                         className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
                       >
                         댓글 작성
@@ -469,9 +485,12 @@ export default function IssueDetailPage({
                               {new Date(c.createdAt).toLocaleString("ko-KR")}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
-                            {c.content}
-                          </p>
+                          <div className="text-sm text-gray-800 break-words">
+                            <RichEditor
+                              content={c.content}
+                              editable={false}
+                            />
+                          </div>
                         </div>
                       );
                     }
