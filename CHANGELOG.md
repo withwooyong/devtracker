@@ -3,6 +3,19 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-23] 4부 — 모바일 칸반 상태 select 피커 핫픽스
+
+### Fixed
+- **모바일 칸반 `MobileKanbanCard`의 상태 select 옵션 피커가 화면 좌상단에 미니 박스로 렌더되던 문제** — 사용자 스크린샷으로 발견. 원인: `text-xs`(12px) 적용으로 iOS Safari가 포커스 시 자동 줌인 트리거 → native 옵션 피커 위치/스케일이 뒤틀림(Android/DevTools 에뮬레이터에서도 유사 사례 알려짐). 해결: `text-xs` → `text-sm` + inline `style={{ fontSize: '16px' }}`(iOS 자동 줌 차단 기준선) + `py-1` → `py-1.5`(터치 타겟 확대). 셀렉트 버튼 가로/세로 크기는 수 px 증가 수준이라 카드 레이아웃 영향 미미 — `043855b`
+
+### 배포
+- `043855b` → `devtracker-end8fqkrj` Ready (50s). 프로덕션 URL 동일: https://devtracker-dusky.vercel.app
+
+### 검증 요청
+- 실제 스마트폰(iOS Safari / Android Chrome)에서 재현 여부 확인 필요. DevTools 에뮬레이터에서만 발생하는 현상이었다면 실기에서는 원래부터 정상일 가능성도 있음
+
+---
+
 ## [2026-04-23] 3부 — RichEditor 프로덕션 버그 핫픽스 + B안 묶음 4(번다운 가독성) 완료
 
 ### Fixed

@@ -1,16 +1,25 @@
 # Session Handoff
 
-> Last updated: 2026-04-23 (KST, /handoff 3부)
+> Last updated: 2026-04-23 (KST, /handoff 4부)
 > Branch: `main`
-> Latest commit: `9bd97d0` — fix: 번다운 차트 모바일 가독성
+> Latest commit: `043855b` — fix: 모바일 칸반 상태 select 옵션 피커 표시 문제 핫픽스
 > Production: https://devtracker-dusky.vercel.app
-> 최신 배포: 자동 트리거 `devtracker-aafcee7kb` Ready (51s, `9bd97d0` 기준)
+> 최신 배포: 자동 트리거 `devtracker-end8fqkrj` Ready (50s, `043855b` 기준)
 
 ## Current Status
 
-**✅ RichEditor 프로덕션 버그 핫픽스 + B안 묶음 4(번다운 차트 모바일 가독성) 완료.** 2부 완료 후 프로덕션에서 사용자가 "댓글 RichEditor의 H1/목록/인용 버튼이 시각적으로 동작 안 함"을 발견 → Tailwind v4 Preflight + `@tailwindcss/typography` 플러그인 부재가 원인으로 드러남 → `globals.css`에 `.ProseMirror` 한정 CSS 규칙 77줄 직접 정의로 해결(`61947a9`). 이어서 B안(접근성/가독성 커밋)의 묶음 4 번다운 차트 모바일 가독성(`9bd97d0`) 처리. 두 커밋 모두 origin 반영 + Vercel 자동 배포 Ready 확인됨. **다음 세션 최우선은 B안 묶음 2(팝오버 외부 클릭 닫힘)**.
+**✅ 4부(모바일 칸반 select 핫픽스) 완료.** 3부 배포 후 사용자가 모바일 화면 스크린샷으로 "상태 select를 누르면 옵션 피커가 화면 좌상단에 미니 박스로 렌더되고 글씨 판독 불가"를 제보. 원인 `text-xs`(12px) → iOS Safari 포커스 자동 줌 → native 피커 스케일 틀어짐. 해결: `text-sm` + inline `fontSize: 16px` + padding 살짝 확대(`043855b`). origin 반영 + Vercel 자동 배포 Ready. **사용자 실기 재현 여부 확인 대기 중** (DevTools 에뮬레이터만의 현상일 가능성도 존재). **다음 세션 최우선은 여전히 B안 묶음 2(팝오버 외부 클릭 닫힘)**.
 
-## Completed This Session (2026-04-23 3부)
+## Completed This Session (2026-04-23 4부)
+
+| # | Task | Commit |
+|---|------|--------|
+| 1 | 사용자 스크린샷으로 모바일 칸반 상태 select 옵션 피커가 화면 좌상단에 미니 박스로 렌더되는 버그 발견 | — |
+| 2 | 원인 진단: `text-xs`(12px) select → iOS Safari 포커스 자동 줌 트리거 → native 피커 위치/스케일 틀어짐. Android/DevTools 에뮬레이터에도 유사 사례 보고됨 | — |
+| 3 | 핫픽스: `text-xs` → `text-sm` + inline `style={{ fontSize: '16px' }}`(iOS 자동 줌 방지 기준선) + `py-1` → `py-1.5`(터치 타겟 확대) | `043855b` |
+| 4 | Vercel 자동 배포 Ready(`devtracker-end8fqkrj`, 50s) | — |
+
+## Completed Previous Block (2026-04-23 3부)
 
 | # | Task | Commit |
 |---|------|--------|
@@ -23,6 +32,8 @@
 ## Recent Commits
 
 ```
+043855b  fix: 모바일 칸반 상태 select 옵션 피커 표시 문제 핫픽스
+609a687  docs: /handoff 2026-04-23 3부 — RichEditor 핫픽스 + B안 묶음 4 번다운 가독성
 9bd97d0  fix: 번다운 차트 모바일 가독성 (font 10→18, max-w 640px)
 61947a9  fix: RichEditor 블록 스타일 복구 (h1/h2/h3/list/blockquote/pre/hr)
 31e4d17  docs: /handoff 2026-04-23 2부 — sonner 토스트 + 댓글 RichEditor 통일
@@ -58,6 +69,7 @@ e74dc68  feat: sonner 도입 + Providers에 Toaster 마운트
 
 ### 이번 세션 신규 (참고용 — 대부분 해소됨)
 
+- **모바일 select 옵션 피커 이슈가 실기에서도 재발하는지 미확인** — 4부 핫픽스 후 사용자 재검증 대기. 실기에서도 재발하면 **B안 묶음 1(ARIA 탭 + 커스텀 드롭다운)에 "native select → 커스텀 드롭다운 교체"를 묶어서 처리** 고려. `text-xs` 외에도 기타 모바일 폼 요소에 12~14px가 남아 있는지 점검 필요
 - **`@tailwindcss/typography` 플러그인 부재** — 의도적. RichEditor 블록 스타일이 `globals.css`의 `.ProseMirror` 규칙에 의존. 향후 다른 `prose` 사용처가 생기면 plugin 설치 재검토 필요
 - **BurndownChart 와이드 데스크톱(2000px+)에서 차트가 640px에 캡** — `mx-auto`로 중앙 정렬되나 빈 좌우 여백이 눈에 띌 수 있음. 현 프로젝트 레이아웃(max-w-6xl 1152px)에서는 무영향
 
@@ -115,6 +127,7 @@ e74dc68  feat: sonner 도입 + Providers에 Toaster 마운트
 - [ ] deployments fetch `r.ok` + `environment` 타입 `DeployEnvironment`
 - [ ] BurndownChart 타임존 불일치 (`startDate` UTC vs `today` 로컬)
 - [ ] e2e `data-testid` 부여
+- [x] ~~모바일 칸반 상태 select 옵션 피커 핫픽스 (text-xs → text-sm + fontSize 16px)~~ (`043855b`)
 - [x] ~~RichEditor 블록 스타일 복구 (Tailwind v4 Preflight 대응)~~ (`61947a9`)
 - [x] ~~A. 성공 토스트 추가~~ (`2204a35`)
 - [x] ~~C. 댓글/답글 RichEditor 적용~~ (`58f3949`)
@@ -133,7 +146,8 @@ e74dc68  feat: sonner 도입 + Providers에 Toaster 마운트
 
 ## Context for Next Session
 
-- **사용자 원본 의도 (이번 세션 3부)**: 2부 배포 직후 프로덕션에서 RichEditor 블록 스타일 깨짐을 스크린샷으로 제보. 핫픽스 후 B안 4개 하위 묶음 중 **묶음 4(BurndownChart)부터 /ted-run으로 처리**하기로 합의하고 실행. 모두 완료 후 /handoff로 3부 마감
+- **사용자 원본 의도 (이번 세션 4부)**: 3부 배포 후 모바일 칸반 스크린샷으로 select 옵션 피커 렌더 버그 제보 → 핫픽스(`043855b`) 후 /handoff 4부 마감. 실기 재검증 결과 대기 중
+- **사용자 원본 의도 (3부)**: 2부 배포 직후 프로덕션에서 RichEditor 블록 스타일 깨짐을 스크린샷으로 제보. 핫픽스 후 B안 4개 하위 묶음 중 **묶음 4(BurndownChart)부터 /ted-run으로 처리**하기로 합의하고 실행. 모두 완료 후 /handoff로 3부 마감
 - **다음 세션 최우선: B안 묶음 2 (팝오버 외부 클릭 닫힘)**
   - 범위: (a) 공용 `useClickOutside(ref, onOutside)` 훅 신설 — `useEffect`에서 document mousedown 리스너 등록, ref 외부 클릭 시 콜백 (b) 저장된 필터 팝오버에 적용 (필터 바에서 사용)
   - 난이도 낮음, 리스크 낮음, 1커밋으로 충분
@@ -146,7 +160,7 @@ e74dc68  feat: sonner 도입 + Providers에 Toaster 마운트
   - gh credential helper 자동 호출은 여전히 불안정 → `git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin main` 우회가 안정적 경로. **매번 이 형태로 push 중**
   - **PC 크래시 3회 이력**: `pnpm dev` + Playwright 동시 기동 회피 지속. 검증은 `pnpm build` 정적 + Vercel 원격 빌드 + 프로덕션 URL 수동 확인 조합
 - **사용자(허우용=Ted) 선호**: /ted-run 파이프라인. **push·프로덕션 배포는 명시 요청 시에만** (글로벌 CLAUDE.md). 커밋 메시지 한글. 비가역 작업(Turso 스키마 변경 등)은 사전 승인
-- **푸시 상태**: 모든 커밋 `origin/main` 반영 완료 (`9bd97d0`까지)
+- **푸시 상태**: 모든 커밋 `origin/main` 반영 완료 (`043855b`까지)
 - **Co-Authored-By**: 프로젝트 `.claude/settings.local.json`에서 `includeCoAuthoredBy: true`
 - Production URL: https://devtracker-dusky.vercel.app
 - Turso DB: `libsql://devtracker-withwooyong.aws-ap-northeast-1.turso.io`
@@ -189,11 +203,17 @@ e74dc68  feat: sonner 도입 + Providers에 Toaster 마운트
 - **토스트 검증 (수동)**: 프로덕션 `/login` → `/settings` → DevTools Network 탭에서 저장 요청 실패 유도(offline 체크) → 상단 중앙 빨간 토스트 확인
 - **번다운 차트 가독성 기준**: 모바일 360px에서 fontSize 18 × 0.5625 ≈ 10.1px 달성. 이보다 작은 화면은 현재 대응 범위 외
 
-## Files Modified This Session (3부)
+## Files Modified This Session (4부)
+
+```
+src/app/projects/[projectKey]/board/page.tsx  | +5/-1  MobileKanbanCard select: text-xs→text-sm + fontSize 16px + py-1→1.5
+CHANGELOG.md                                  | +15    4부 섹션 prepend
+HANDOFF.md                                    | 부분 개정 (4부 블록 추가, 나머지 3부 구조 유지)
+```
+
+## Files Modified Previous Block (3부)
 
 ```
 src/app/globals.css                          | +77  .ProseMirror 블록 스타일 규칙 (h1-3/list/blockquote/pre/code/hr)
 src/components/common/burndown-chart.tsx     | ±21  fontSize 10→18, max-w 640px, padding 조정
-CHANGELOG.md                                 | +43  3부 섹션 prepend
-HANDOFF.md                                   | (전면 개편)
 ```
