@@ -5,6 +5,20 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ProjectTabs } from "@/components/layout/project-tabs";
 import { PriorityBadge } from "@/components/common/status-badge";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useTilt } from "@/components/board/use-tilt";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 import {
   DndContext,
@@ -16,6 +30,7 @@ import {
   useSensors,
   type DragStartEvent,
   type DragEndEvent,
+  type DragOverEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -27,11 +42,43 @@ import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import type { Issue, IssueStatus } from "@/types/issue";
 
-const COLUMNS: { id: IssueStatus; label: string; color: string }[] = [
-  { id: "TODO", label: "할 일", color: "bg-gray-200" },
-  { id: "IN_PROGRESS", label: "진행 중", color: "bg-blue-200" },
-  { id: "IN_REVIEW", label: "리뷰 중", color: "bg-yellow-200" },
-  { id: "DONE", label: "완료", color: "bg-green-200" },
+type ColumnDef = {
+  id: IssueStatus;
+  label: string;
+  base: string; // CSS 변수명
+  glow: string;
+  dot: string; // tailwind bg-*
+};
+
+const COLUMNS: ColumnDef[] = [
+  {
+    id: "TODO",
+    label: "할 일",
+    base: "var(--kanban-todo)",
+    glow: "var(--kanban-todo-glow)",
+    dot: "bg-slate-400",
+  },
+  {
+    id: "IN_PROGRESS",
+    label: "진행 중",
+    base: "var(--kanban-progress)",
+    glow: "var(--kanban-progress-glow)",
+    dot: "bg-blue-500",
+  },
+  {
+    id: "IN_REVIEW",
+    label: "리뷰 중",
+    base: "var(--kanban-review)",
+    glow: "var(--kanban-review-glow)",
+    dot: "bg-amber-500",
+  },
+  {
+    id: "DONE",
+    label: "완료",
+    base: "var(--kanban-done)",
+    glow: "var(--kanban-done-glow)",
+    dot: "bg-emerald-500",
+  },
 ];
 
 function KanbanCard({
@@ -50,42 +97,66 @@ function KanbanCard({
     isDragging,
   } = useSortable({ id: issue.id, data: { issue } });
 
+  const tilt = useTilt({ max: 5, magnet: 3, active: !isDragging });
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.4 : 1,
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing"
-    >
-      <Link
-        href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
-        prefetch={false}
-        className="text-sm font-medium text-gray-900 hover:text-blue-600 block mb-2"
-        onClick={(e) => e.stopPropagation()}
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <div
+        ref={tilt.ref}
+        onPointerMove={tilt.onPointerMove}
+        onPointerLeave={tilt.onPointerLeave}
+        onPointerDown={tilt.onPointerDown}
+        className={cn(
+          "tilt-card relative rounded-xl",
+          "cursor-grab active:cursor-grabbing"
+        )}
       >
-        {issue.title}
-      </Link>
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400">
-          {projectKey}-{issue.issueNumber}
-        </span>
-        <PriorityBadge priority={issue.priority} />
-      </div>
-      {issue.assignee && (
-        <div className="mt-2 flex items-center gap-1.5">
-          <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-[10px] text-white font-medium">
-            {issue.assignee.name.charAt(0)}
+        <Card
+          className={cn(
+            "gap-2 py-3 bg-card/95 backdrop-blur-sm",
+            "shadow-sm hover:shadow-lg hover:shadow-black/5",
+            "transition-shadow border-border/60"
+          )}
+        >
+          <div className="px-3 flex flex-col gap-2">
+            <Link
+              href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
+              prefetch={false}
+              className="text-sm font-medium text-foreground hover:text-primary block leading-snug"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {issue.title}
+            </Link>
+            <div className="flex items-center justify-between gap-2">
+              <Badge
+                variant="outline"
+                className="font-mono text-[10px] px-1.5 py-0 h-5 text-muted-foreground"
+              >
+                {projectKey}-{issue.issueNumber}
+              </Badge>
+              <PriorityBadge priority={issue.priority} />
+            </div>
+            {issue.assignee && (
+              <div className="flex items-center gap-1.5 pt-1 border-t border-border/40">
+                <Avatar className="size-5">
+                  <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
+                    {issue.assignee.name.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-xs text-muted-foreground truncate">
+                  {issue.assignee.name}
+                </span>
+              </div>
+            )}
           </div>
-          <span className="text-xs text-gray-500">{issue.assignee.name}</span>
-        </div>
-      )}
+        </Card>
+      </div>
     </div>
   );
 }
@@ -100,51 +171,53 @@ function MobileKanbanCard({
   onStatusChange: (issue: Issue, status: IssueStatus) => void;
 }) {
   return (
-    <div className="bg-white p-3 rounded-lg border border-gray-200">
-      <div className="flex items-start justify-between gap-2 mb-2">
+    <Card className="gap-2 py-3">
+      <div className="px-3 flex items-start justify-between gap-2">
         <Link
           href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
           prefetch={false}
           className="min-w-0 flex-1"
         >
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-muted-foreground font-mono">
             {projectKey}-{issue.issueNumber}
           </span>
-          <h3 className="text-sm font-medium text-gray-900 mt-0.5 line-clamp-2 break-words">
+          <h3 className="text-sm font-medium text-foreground mt-0.5 line-clamp-2 break-words">
             {issue.title}
           </h3>
         </Link>
         <PriorityBadge priority={issue.priority} />
       </div>
-      <div className="flex items-center justify-between gap-2">
-        <select
+      <div className="px-3 flex items-center justify-between gap-2">
+        <Select
           value={issue.status}
-          onChange={(e) =>
-            onStatusChange(issue, e.target.value as IssueStatus)
-          }
-          // iOS Safari는 폼 요소 font-size < 16px일 때 포커스 시 자동 줌인을 트리거하고
-          // 그 과정에서 native 옵션 피커의 위치/스케일이 깨지는 사례가 있음.
-          // inline style로 16px 강제해 자동 줌 방지.
-          className="text-sm border border-gray-300 rounded px-2 py-1.5 text-gray-700"
-          style={{ fontSize: "16px" }}
-          aria-label="상태 변경"
+          onValueChange={(v) => onStatusChange(issue, v as IssueStatus)}
         >
-          {COLUMNS.map((col) => (
-            <option key={col.id} value={col.id}>
-              {col.label}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger size="sm" className="text-sm" aria-label="상태 변경">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {COLUMNS.map((col) => (
+              <SelectItem key={col.id} value={col.id}>
+                <span
+                  className={cn("size-2 rounded-full inline-block", col.dot)}
+                />
+                {col.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {issue.assignee && (
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 min-w-0">
-            <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-[10px] text-white font-medium flex-shrink-0">
-              {issue.assignee.name.charAt(0)}
-            </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+            <Avatar className="size-5">
+              <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
+                {issue.assignee.name.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
             <span className="truncate">{issue.assignee.name}</span>
           </div>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -152,10 +225,12 @@ function KanbanColumn({
   column,
   issues,
   projectKey,
+  isDragOver,
 }: {
-  column: (typeof COLUMNS)[0];
+  column: ColumnDef;
   issues: Issue[];
   projectKey: string;
+  isDragOver: boolean;
 }) {
   const { setNodeRef } = useDroppable({
     id: column.id,
@@ -163,28 +238,95 @@ function KanbanColumn({
   });
 
   return (
-    <div className="flex-1 min-w-[260px]">
-      <div
-        className={`flex items-center gap-2 mb-3 px-3 py-2 rounded-t-lg ${column.color}`}
-      >
-        <h3 className="text-sm font-semibold text-gray-800">{column.label}</h3>
-        <span className="text-xs text-gray-600 bg-white/50 px-1.5 py-0.5 rounded">
-          {issues.length}
-        </span>
-      </div>
+    <div className="flex-1 min-w-[272px]">
       <div
         ref={setNodeRef}
-        className="space-y-2 min-h-[200px] bg-gray-50 p-2 rounded-b-lg"
+        data-dragover={isDragOver || undefined}
+        className={cn(
+          "ambient-column rounded-xl p-3 min-h-[320px]",
+          "flex flex-col gap-3"
+        )}
+        style={
+          {
+            "--column-base": column.base,
+            "--column-glow": column.glow,
+          } as React.CSSProperties
+        }
       >
-        <SortableContext
-          items={issues.map((i) => i.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          {issues.map((issue) => (
-            <KanbanCard key={issue.id} issue={issue} projectKey={projectKey} />
-          ))}
-        </SortableContext>
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "size-2.5 rounded-full ring-2 ring-background/80",
+                column.dot
+              )}
+            />
+            <h3 className="text-sm font-semibold text-foreground tracking-tight">
+              {column.label}
+            </h3>
+            <Badge
+              variant="secondary"
+              className="h-5 px-1.5 text-[11px] bg-background/70 backdrop-blur-sm"
+            >
+              {issues.length}
+            </Badge>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <SortableContext
+            items={issues.map((i) => i.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {issues.map((issue) => (
+              <KanbanCard key={issue.id} issue={issue} projectKey={projectKey} />
+            ))}
+          </SortableContext>
+          {issues.length === 0 && (
+            <div className="flex items-center justify-center h-24 text-xs text-muted-foreground/70 italic border border-dashed border-border/60 rounded-lg">
+              비어 있음
+            </div>
+          )}
+        </div>
       </div>
+    </div>
+  );
+}
+
+function BoardSkeleton() {
+  return (
+    <div className="flex gap-4 overflow-x-auto pb-4">
+      {COLUMNS.map((col) => (
+        <div
+          key={col.id}
+          className="flex-1 min-w-[272px] ambient-column rounded-xl p-3 min-h-[320px]"
+          style={
+            {
+              "--column-base": col.base,
+              "--column-glow": col.glow,
+            } as React.CSSProperties
+          }
+        >
+          <div className="flex items-center gap-2 px-1 mb-3">
+            <span className={cn("size-2.5 rounded-full", col.dot)} />
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-5 w-7 rounded-md" />
+          </div>
+          <div className="flex flex-col gap-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i} className="gap-2 py-3 bg-card/90">
+                <div className="px-3 flex flex-col gap-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-12" />
+                    <Skeleton className="h-5 w-10" />
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -198,12 +340,17 @@ export default function BoardPage({
   const queryClient = useQueryClient();
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
   const [activeColumn, setActiveColumn] = useState<IssueStatus>("TODO");
+  const [overColumn, setOverColumn] = useState<IssueStatus | null>(null);
 
   const { data: projectData } = useQuery<{
     project: { id: string; name: string };
   }>({
     queryKey: ["project", projectKey],
-    queryFn: () => fetch(`/api/projects/${projectKey}`).then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
+    queryFn: () =>
+      fetch(`/api/projects/${projectKey}`).then((r) => {
+        if (!r.ok) throw new Error("fetch failed");
+        return r.json();
+      }),
   });
 
   const { data, isLoading } = useQuery<{ issues: Issue[] }>({
@@ -318,12 +465,23 @@ export default function BoardPage({
     setActiveIssue(issue ?? null);
   }
 
-  function handleDragOver() {
-    // No-op — real reordering happens on drag end
+  function handleDragOver(event: DragOverEvent) {
+    const overId = event.over?.id;
+    if (!overId) {
+      setOverColumn(null);
+      return;
+    }
+    const asCol = COLUMNS.find((c) => c.id === overId)?.id ?? null;
+    if (asCol) {
+      setOverColumn(asCol);
+      return;
+    }
+    setOverColumn(findColumnByIssueId(overId as string));
   }
 
   function handleDragEnd(event: DragEndEvent) {
     setActiveIssue(null);
+    setOverColumn(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -354,7 +512,6 @@ export default function BoardPage({
       return;
     }
 
-    // Cross-column move
     const sourceItems = issuesByStatus[sourceCol].filter(
       (i) => i.id !== activeId
     );
@@ -367,7 +524,6 @@ export default function BoardPage({
     const targetItems = [...issuesByStatus[targetCol]];
     const overIdx = targetItems.findIndex((i) => i.id === overId);
     if (overIdx === -1) {
-      // Dropped onto column (empty area) — append to end
       targetItems.push(movedItem);
     } else {
       targetItems.splice(overIdx, 0, movedItem);
@@ -393,7 +549,7 @@ export default function BoardPage({
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6 gap-3">
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-bold text-gray-900 truncate">
+            <h1 className="text-2xl font-bold text-foreground truncate tracking-tight">
               {projectData?.project?.name ?? projectKey}
             </h1>
             <ProjectTabs projectKey={projectKey} />
@@ -401,33 +557,48 @@ export default function BoardPage({
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-          </div>
+          <>
+            <div className="hidden md:block">
+              <BoardSkeleton />
+            </div>
+            <div className="md:hidden space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="gap-2 py-3">
+                  <div className="px-3 flex flex-col gap-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </>
         ) : (
           <>
             {/* Mobile: status pill selector + single column card list */}
             <div className="md:hidden space-y-4">
               <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
                 {COLUMNS.map((col) => (
-                  <button
+                  <Button
                     key={col.id}
                     type="button"
+                    size="sm"
+                    variant={activeColumn === col.id ? "default" : "outline"}
                     onClick={() => setActiveColumn(col.id)}
-                    className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap border transition-colors ${
-                      activeColumn === col.id
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
+                    className="rounded-full whitespace-nowrap"
                   >
+                    <span
+                      className={cn("size-1.5 rounded-full mr-0.5", col.dot)}
+                    />
                     {col.label} ({issuesByStatus[col.id].length})
-                  </button>
+                  </Button>
                 ))}
               </div>
               {issuesByStatus[activeColumn].length === 0 ? (
-                <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500 text-sm">
-                  이 상태의 이슈가 없습니다.
-                </div>
+                <Card className="py-8">
+                  <p className="text-center text-muted-foreground text-sm px-6">
+                    이 상태의 이슈가 없습니다.
+                  </p>
+                </Card>
               ) : (
                 <div className="space-y-2">
                   {issuesByStatus[activeColumn].map((issue) => (
@@ -458,19 +629,22 @@ export default function BoardPage({
                       column={col}
                       issues={issuesByStatus[col.id]}
                       projectKey={projectKey}
+                      isDragOver={overColumn === col.id}
                     />
                   ))}
                 </div>
                 <DragOverlay>
                   {activeIssue && (
-                    <div className="bg-white p-3 rounded-lg border-2 border-blue-400 shadow-lg w-[260px]">
-                      <p className="text-sm font-medium">
-                        {activeIssue.title}
-                      </p>
-                      <span className="text-xs text-gray-400">
-                        {projectKey}-{activeIssue.issueNumber}
-                      </span>
-                    </div>
+                    <Card className="w-[260px] gap-2 py-3 shadow-2xl shadow-black/20 border-primary/40 rotate-[1.5deg]">
+                      <div className="px-3 flex flex-col gap-2">
+                        <p className="text-sm font-medium text-foreground">
+                          {activeIssue.title}
+                        </p>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {projectKey}-{activeIssue.issueNumber}
+                        </span>
+                      </div>
+                    </Card>
                   )}
                 </DragOverlay>
               </DndContext>
