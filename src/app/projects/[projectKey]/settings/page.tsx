@@ -3,6 +3,7 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ProjectTabs } from "@/components/layout/project-tabs";
 import { useAuthStore } from "@/stores/auth-store";
@@ -78,7 +79,6 @@ function SettingsForm({
   const [webhookSecretAction, setWebhookSecretAction] = useState<
     null | "set" | "clear"
   >(null);
-  const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const updateMutation = useMutation({
@@ -103,10 +103,9 @@ function SettingsForm({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project", projectKey] });
       setSuccessMsg("저장되었습니다.");
-      setError(null);
     },
     onError: (err: Error) => {
-      setError(err.message);
+      toast.error(err.message);
       setSuccessMsg(null);
     },
   });
@@ -115,7 +114,6 @@ function SettingsForm({
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        setError(null);
         setSuccessMsg(null);
         const body: Record<string, unknown> = {
           description: description.trim(),
@@ -248,11 +246,6 @@ function SettingsForm({
         </p>
       </div>
 
-      {error && (
-        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
-          {error}
-        </div>
-      )}
       {successMsg && (
         <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
           {successMsg}

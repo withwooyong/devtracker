@@ -24,6 +24,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { toast } from "sonner";
 import type { Issue, IssueStatus } from "@/types/issue";
 
 const COLUMNS: { id: IssueStatus; label: string; color: string }[] = [
@@ -249,6 +250,7 @@ export default function BoardPage({
           ctx.previous
         );
       }
+      toast.error("칸반 순서 저장에 실패했습니다. 다시 시도해 주세요.");
     },
     onSettled: () => {
       queryClient.invalidateQueries({

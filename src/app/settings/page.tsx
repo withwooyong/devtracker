@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/main-layout";
 import type { User } from "@/types/user";
 
@@ -44,7 +45,6 @@ export default function UserSettingsPage() {
 function ProfileForm({ user }: { user: User }) {
   const queryClient = useQueryClient();
   const [githubLogin, setGithubLogin] = useState(user.githubLogin ?? "");
-  const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const updateMutation = useMutation({
@@ -69,10 +69,9 @@ function ProfileForm({ user }: { user: User }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
       setSuccessMsg("저장되었습니다.");
-      setError(null);
     },
     onError: (err: Error) => {
-      setError(err.message);
+      toast.error(err.message);
       setSuccessMsg(null);
     },
   });
@@ -81,7 +80,6 @@ function ProfileForm({ user }: { user: User }) {
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        setError(null);
         setSuccessMsg(null);
         updateMutation.mutate({ githubLogin: githubLogin.trim() });
       }}
@@ -137,11 +135,6 @@ function ProfileForm({ user }: { user: User }) {
         </p>
       </div>
 
-      {error && (
-        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
-          {error}
-        </div>
-      )}
       {successMsg && (
         <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
           {successMsg}

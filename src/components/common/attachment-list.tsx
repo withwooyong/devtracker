@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import type { Attachment } from "@/types/attachment";
 import { MAX_ATTACHMENT_SIZE } from "@/types/attachment";
 import { useAuthStore } from "@/stores/auth-store";
@@ -27,7 +28,6 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
   const { user } = useAuthStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<{ attachments: Attachment[] }>({
     queryKey: ["attachments", projectKey, issueNumber],
@@ -61,9 +61,8 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
       queryClient.invalidateQueries({
         queryKey: ["activities", projectKey, issueNumber],
       });
-      setError(null);
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const deleteMutation = useMutation({
@@ -86,14 +85,13 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
         queryKey: ["activities", projectKey, issueNumber],
       });
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => toast.error(err.message),
   });
 
   function handleFile(file: File | null | undefined) {
     if (!file) return;
-    setError(null);
     if (file.size > MAX_ATTACHMENT_SIZE) {
-      setError("파일 크기는 4MB 이하로 제한됩니다.");
+      toast.error("파일 크기는 4MB 이하로 제한됩니다.");
       return;
     }
     uploadMutation.mutate(file);
@@ -151,11 +149,6 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
         <p className="text-xs text-gray-400 mt-1">최대 4MB</p>
         {uploadMutation.isPending && (
           <p className="text-xs text-blue-600 mt-2">업로드 중…</p>
-        )}
-        {error && (
-          <p className="text-xs text-red-600 mt-2 bg-red-50 border border-red-200 rounded px-2 py-1">
-            {error}
-          </p>
         )}
       </div>
 
