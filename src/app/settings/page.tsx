@@ -45,7 +45,6 @@ export default function UserSettingsPage() {
 function ProfileForm({ user }: { user: User }) {
   const queryClient = useQueryClient();
   const [githubLogin, setGithubLogin] = useState(user.githubLogin ?? "");
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const updateMutation = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
@@ -68,19 +67,15 @@ function ProfileForm({ user }: { user: User }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
-      setSuccessMsg("저장되었습니다.");
+      toast.success("저장되었습니다.");
     },
-    onError: (err: Error) => {
-      toast.error(err.message);
-      setSuccessMsg(null);
-    },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        setSuccessMsg(null);
         updateMutation.mutate({ githubLogin: githubLogin.trim() });
       }}
       className="bg-white p-6 rounded-lg border border-gray-200 space-y-5"
@@ -134,12 +129,6 @@ function ProfileForm({ user }: { user: User }) {
           <code>withwooyong</code>). 비워두면 매핑이 해제됩니다.
         </p>
       </div>
-
-      {successMsg && (
-        <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
-          {successMsg}
-        </div>
-      )}
 
       <div className="flex gap-2 pt-2">
         <button

@@ -61,6 +61,7 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
       queryClient.invalidateQueries({
         queryKey: ["activities", projectKey, issueNumber],
       });
+      toast.success("업로드되었습니다.");
     },
     onError: (err: Error) => toast.error(err.message),
   });

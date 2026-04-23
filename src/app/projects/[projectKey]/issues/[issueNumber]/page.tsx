@@ -2,6 +2,7 @@
 
 import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ActivityTimeline } from "@/components/common/activity-timeline";
 import { AttachmentList } from "@/components/common/attachment-list";
@@ -70,6 +71,9 @@ export default function IssueDetailPage({
         if (!r.ok) throw new Error("fetch failed");
         return r.json();
       }),
+    // 저장 성공 토스트는 편집 다이얼로그의 "저장" 버튼에서 per-call onSuccess로 처리.
+    // 인라인 드롭다운(상태/우선순위/담당자/라벨/기한) 변경은 조용히 처리하기 위해
+    // mutation-level onSuccess에는 토스트를 두지 않는다.
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["issue", projectKey, issueNumber],
@@ -104,8 +108,10 @@ export default function IssueDetailPage({
       if (vars.parentId) {
         setReplyContent("");
         setReplyingTo(null);
+        toast.success("답글이 작성되었습니다.");
       } else {
         setComment("");
+        toast.success("댓글이 작성되었습니다.");
       }
     },
   });
@@ -184,10 +190,16 @@ export default function IssueDetailPage({
                   </button>
                   <button
                     onClick={() =>
-                      updateMutation.mutate({
-                        title: editTitle,
-                        description: editDesc,
-                      })
+                      updateMutation.mutate(
+                        {
+                          title: editTitle,
+                          description: editDesc,
+                        },
+                        {
+                          onSuccess: () =>
+                            toast.success("저장되었습니다."),
+                        }
+                      )
                     }
                     className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm"
                   >

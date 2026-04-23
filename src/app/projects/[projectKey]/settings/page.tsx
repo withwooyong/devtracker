@@ -79,7 +79,6 @@ function SettingsForm({
   const [webhookSecretAction, setWebhookSecretAction] = useState<
     null | "set" | "clear"
   >(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const updateMutation = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
@@ -102,19 +101,15 @@ function SettingsForm({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project", projectKey] });
-      setSuccessMsg("저장되었습니다.");
+      toast.success("저장되었습니다.");
     },
-    onError: (err: Error) => {
-      toast.error(err.message);
-      setSuccessMsg(null);
-    },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        setSuccessMsg(null);
         const body: Record<string, unknown> = {
           description: description.trim(),
           githubRepo: githubRepo.trim(),
@@ -245,12 +240,6 @@ function SettingsForm({
           이 값으로 서명을 재검증합니다. 값은 저장 후 다시 표시되지 않습니다.
         </p>
       </div>
-
-      {successMsg && (
-        <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
-          {successMsg}
-        </div>
-      )}
 
       <div className="flex gap-2 pt-2">
         <button

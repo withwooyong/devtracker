@@ -3,6 +3,7 @@
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/main-layout";
 import { RichEditor } from "@/components/common/rich-editor";
 import type { User } from "@/types/user";
@@ -46,6 +47,7 @@ export default function NewIssuePage({
         return r.json();
       }),
     onSuccess: () => {
+      toast.success("이슈가 생성되었습니다.");
       router.push(`/projects/${projectKey}`);
     },
   });
