@@ -3,6 +3,35 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-23] 추가 — sonner 토스트 UI 도입 + 댓글/답글 RichEditor 통일
+
+### Added
+- `sonner@2.0.7` 의존성 추가. `src/components/providers.tsx`에 `<Toaster>` 마운트. 처음 `position="bottom-right"`로 배선 → 상단 중앙이 본문을 덜 가린다는 판단으로 `top-center`로 확정 — `e74dc68`, `82e15ea`
+- `src/app/projects/[projectKey]/issues/[issueNumber]/page.tsx`에 `isHtmlEmpty(html)` helper — Tiptap 빈 상태 `<p></p>` + `&nbsp;`(U+00A0) 엣지 케이스를 걸러내 빈 댓글/답글 제출 방지 — `58f3949`
+- `tests/e2e/toast.spec.ts` — Toaster 마운트 확인 + 사용자/프로젝트 설정 저장 실패 시 토스트 표출 Playwright 스펙. 현 세션에서 dev 서버 + Playwright 동시 기동이 PC 부담을 주는 이력(3회 크래시)으로 실제 실행 검증은 보류, 코드만 보존 — `0ecb150`
+
+### Changed
+- **핵심 mutation `onError`를 sonner `toast.error`로 배선**: 칸반 `boardMutation`(rollback + 토스트), 첨부 업로드/삭제/크기 초과, 사용자 프로필 저장, 프로젝트 설정 저장 — `r.ok` 체크로 surface만 되던 에러를 사용자에게 확실히 알림. `attachment-list.tsx`의 `error` state + 인라인 빨간 배너 JSX는 완전 제거 — `d5e1815`
+- **핵심 mutation `onSuccess`에 `toast.success` 추가**: 이슈 생성, 편집 다이얼로그 저장(per-call onSuccess로 인라인 드롭다운과 분리), 댓글/답글 작성(`vars.parentId` 분기로 구분된 메시지), 첨부 업로드, 사용자/프로젝트 설정 저장 — `2204a35`
+- 설정 페이지의 기존 인라인 녹색 `successMsg` 배너 + state 완전 제거, 토스트로 일원화 (에러와 대칭) — `2204a35`
+- `updateMutation` mutation-level `onSuccess`에 의도 주석 추가 — per-call onSuccess가 저장 버튼의 토스트를 담당하므로 mutation 레벨에 토스트를 추가하면 인라인 드롭다운(상태/우선순위/담당자) 변경에도 스팸됨 — `2204a35`
+- **댓글/답글 입력·렌더를 `RichEditor`로 통일**: 이슈 설명과 동일 Tiptap 컴포넌트 재사용. 댓글 작성 `<textarea h-24>` → `<RichEditor>`, 답글 `<textarea h-20>` → `<RichEditor>`. 렌더 3곳(댓글 탭 댓글/답글, 전체 탭 댓글)의 plain `<p whitespace-pre-wrap>` → `<RichEditor editable={false}>`. 기존 plain text 댓글은 Tiptap viewer가 자동 `<p>` 래핑해 렌더되며, `\n` 줄바꿈이 단일 문단으로 합쳐지는 미세 손실은 용인 — `58f3949`
+- 답글 버튼 토글 시 `replyContent`를 빈 문자열로 리셋 — 다른 댓글의 답글 입력 내용이 새로 여는 답글 폼에 새어 들어오는 UX 회귀 차단 — `58f3949`
+
+### Fixed
+- 칸반 드래그 실패(PATCH `/board` 에러)가 rollback만 되고 사용자에게 인지되지 않던 문제 — `boardMutation.onError`에 `toast.error("칸반 순서 저장에 실패했습니다. 다시 시도해 주세요.")` 추가 — `d5e1815`
+- 첨부파일 4MB 초과 업로드 시 인라인 작은 빨간 문구로만 알려주던 문제 — 토스트로 일관성 확보. 4MB 제한 자체는 ADR-016대로 Vercel 서버리스 함수 body ~4.5MB 한계 기반 유지 — `d5e1815`
+
+### 배포
+- 4개 자동 배포(`devtracker-c95hcaa40`, `devtracker-fc40sjq4g` 등) 모두 Ready (49~57s). `git push origin main` 한 번으로 빌드·배포 완료되는 흐름 반복 검증. `vercel --prod --yes` 수동 실행 없이 전체 PR 흐름 자동화 동작 확인
+
+### 알려진 제한
+- 이슈당 댓글/답글이 많을수록 viewer 모드 Tiptap 인스턴스 수 증가(퍼포먼스 관찰 대상, 5~20명 팀 규모에서는 무영향). 향후 infinite-scroll 도입 시 `React.memo` + 키 안정화 재검토
+- `RichEditor`에 `autoFocus` prop 부재 — 답글 버튼 클릭 후 자동 포커스 안 됨. RichEditor 컴포넌트 개선으로 처리 예정
+- `toast.spec.ts` 3개 케이스는 실제 실행 미검증 상태(코드만 커밋). CI 또는 분리된 환경에서 돌리면 됨
+
+---
+
 ## [2026-04-23] Vercel ↔ GitHub 자동 배포 재연동 + 토스트 UI 방향 합의
 
 ### Changed
