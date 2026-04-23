@@ -45,8 +45,9 @@ export function BurndownChart({
   }
 
   const width = 640;
-  const height = 220;
-  const padding = { top: 16, right: 16, bottom: 28, left: 36 };
+  const height = 240;
+  // padding.left: fontSize 18에서 y-tick 레이블 3자리("100" 등) 수용 여유.
+  const padding = { top: 16, right: 16, bottom: 32, left: 48 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
@@ -87,7 +88,7 @@ export function BurndownChart({
       <h3 className="text-sm font-semibold text-gray-700 mb-2">번다운</h3>
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="w-full h-auto"
+        className="w-full h-auto max-w-[640px] mx-auto"
         role="img"
         aria-label="스프린트 번다운 차트"
       >
@@ -103,11 +104,11 @@ export function BurndownChart({
               strokeDasharray="2 2"
             />
             <text
-              x={padding.left - 6}
-              y={yAt(t) + 3}
+              x={padding.left - 8}
+              y={yAt(t) + 6}
               textAnchor="end"
               className="fill-gray-500"
-              style={{ fontSize: 10 }}
+              style={{ fontSize: 18 }}
             >
               {t}
             </text>
@@ -117,19 +118,19 @@ export function BurndownChart({
         {/* X axis labels */}
         <text
           x={xAt(0)}
-          y={height - 8}
+          y={height - 10}
           textAnchor="start"
           className="fill-gray-500"
-          style={{ fontSize: 10 }}
+          style={{ fontSize: 18 }}
         >
           {formatShort(start)}
         </text>
         <text
           x={xAt(totalDays)}
-          y={height - 8}
+          y={height - 10}
           textAnchor="end"
           className="fill-gray-500"
-          style={{ fontSize: 10 }}
+          style={{ fontSize: 18 }}
         >
           {formatShort(end)}
         </text>
