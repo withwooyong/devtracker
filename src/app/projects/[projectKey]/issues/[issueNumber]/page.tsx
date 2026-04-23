@@ -9,6 +9,21 @@ import { AttachmentList } from "@/components/common/attachment-list";
 import { GitHubLinkList } from "@/components/common/github-link-list";
 import { RichEditor } from "@/components/common/rich-editor";
 import { UserAvatar } from "@/components/common/user-avatar";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 import type { Issue } from "@/types/issue";
 import type { User } from "@/types/user";
@@ -16,15 +31,19 @@ import type { Activity } from "@/types/activity";
 
 type TabKey = "comments" | "activities" | "all";
 
+const UNASSIGNED = "__unassigned__";
+
 // Tiptap 빈 에디터는 "<p></p>"를 getHTML()로 반환한다. 태그를 걷어낸 텍스트가
 // 비어 있으면 사용자가 실제로 입력한 게 없는 것으로 취급한다.
 // &nbsp;(U+00A0)는 trim()이 제거하지 않으므로 공백으로 치환 후 판정한다.
 function isHtmlEmpty(html: string): boolean {
   if (!html) return true;
-  return html
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .trim().length === 0;
+  return (
+    html
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .trim().length === 0
+  );
 }
 
 export default function IssueDetailPage({
@@ -69,7 +88,8 @@ export default function IssueDetailPage({
         if (!r.ok) throw new Error("fetch failed");
         return r.json();
       }),
-    enabled: !!data?.issue?.id && (activeTab === "activities" || activeTab === "all"),
+    enabled:
+      !!data?.issue?.id && (activeTab === "activities" || activeTab === "all"),
   });
 
   const updateMutation = useMutation({
@@ -132,8 +152,31 @@ export default function IssueDetailPage({
   if (isLoading) {
     return (
       <MainLayout>
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        <div className="max-w-4xl mx-auto space-y-4">
+          <Skeleton className="h-5 w-32" />
+          <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4 lg:gap-6">
+            <div className="lg:col-span-2 space-y-4">
+              <Card>
+                <CardContent className="space-y-3">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-6 w-3/4" />
+                  <Skeleton className="h-20 w-full" />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent>
+                  <Skeleton className="h-4 w-full" />
+                </CardContent>
+              </Card>
+            </div>
+            <Card>
+              <CardContent className="space-y-3">
+                <Skeleton className="h-9 w-full" />
+                <Skeleton className="h-9 w-full" />
+                <Skeleton className="h-9 w-full" />
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </MainLayout>
     );
@@ -142,8 +185,12 @@ export default function IssueDetailPage({
   if (!issue) {
     return (
       <MainLayout>
-        <div className="text-center py-12 text-gray-500">
-          이슈를 찾을 수 없습니다.
+        <div className="max-w-4xl mx-auto">
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              이슈를 찾을 수 없습니다.
+            </CardContent>
+          </Card>
         </div>
       </MainLayout>
     );
@@ -151,7 +198,11 @@ export default function IssueDetailPage({
 
   // Build merged timeline for "전체" tab
   type TimelineItem =
-    | { kind: "comment"; createdAt: string; data: NonNullable<Issue["comments"]>[number] }
+    | {
+        kind: "comment";
+        createdAt: string;
+        data: NonNullable<Issue["comments"]>[number];
+      }
     | { kind: "activity"; createdAt: string; data: Activity };
 
   const allItems: TimelineItem[] = [];
@@ -163,7 +214,8 @@ export default function IssueDetailPage({
       allItems.push({ kind: "activity", createdAt: a.createdAt, data: a });
     }
     allItems.sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
   }
 
@@ -172,7 +224,7 @@ export default function IssueDetailPage({
       <div className="max-w-4xl mx-auto">
         <Link
           href={`/projects/${projectKey}`}
-          className="text-sm text-gray-600 hover:text-gray-900 mb-4 inline-block"
+          className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block transition-colors"
         >
           &larr; 이슈 목록으로
         </Link>
@@ -181,74 +233,85 @@ export default function IssueDetailPage({
           {/* Main content */}
           <div className="lg:col-span-2 space-y-4 lg:space-y-6 min-w-0">
             {isEditing ? (
-              <div className="bg-white p-4 rounded-lg border space-y-3">
-                <input
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-lg font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-                />
-                <textarea
-                  value={editDesc}
-                  onChange={(e) => setEditDesc(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg h-40 font-mono text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-                />
-                <div className="flex gap-2 justify-end">
-                  <button
-                    onClick={() => setIsEditing(false)}
-                    className="px-3 py-1.5 text-sm text-gray-600"
-                  >
-                    취소
-                  </button>
-                  <button
-                    onClick={() =>
-                      updateMutation.mutate(
-                        {
-                          title: editTitle,
-                          description: editDesc,
-                        },
-                        {
-                          onSuccess: () =>
-                            toast.success("저장되었습니다."),
-                        }
-                      )
-                    }
-                    className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm"
-                  >
-                    저장
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white p-4 sm:p-6 rounded-lg border">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <span className="text-sm text-gray-600">
-                      {projectKey}-{issue.issueNumber}
-                    </span>
-                    <h1 className="text-xl font-bold text-gray-900 mt-1 break-words">
-                      {issue.title}
-                    </h1>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setEditTitle(issue.title);
-                      setEditDesc(issue.description ?? "");
-                      setIsEditing(true);
-                    }}
-                    className="text-sm text-gray-600 hover:text-blue-600 whitespace-nowrap"
-                  >
-                    편집
-                  </button>
-                </div>
-                {issue.description && (
-                  <div className="mt-4 text-sm break-words">
-                    <RichEditor
-                      content={issue.description}
-                      editable={false}
+              <Card>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-title">제목</Label>
+                    <Input
+                      id="edit-title"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="text-lg font-bold h-11"
                     />
                   </div>
-                )}
-              </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-desc">설명</Label>
+                    <Textarea
+                      id="edit-desc"
+                      value={editDesc}
+                      onChange={(e) => setEditDesc(e.target.value)}
+                      className="h-40 font-mono"
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsEditing(false)}
+                    >
+                      취소
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        updateMutation.mutate(
+                          {
+                            title: editTitle,
+                            description: editDesc,
+                          },
+                          {
+                            onSuccess: () =>
+                              toast.success("저장되었습니다."),
+                          }
+                        )
+                      }
+                    >
+                      저장
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm text-muted-foreground font-mono">
+                        {projectKey}-{issue.issueNumber}
+                      </span>
+                      <h1 className="text-xl font-bold text-foreground mt-1 break-words tracking-tight">
+                        {issue.title}
+                      </h1>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditTitle(issue.title);
+                        setEditDesc(issue.description ?? "");
+                        setIsEditing(true);
+                      }}
+                    >
+                      편집
+                    </Button>
+                  </div>
+                  {issue.description && (
+                    <div className="mt-4 text-sm break-words">
+                      <RichEditor content={issue.description} editable={false} />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             )}
 
             <AttachmentList
@@ -265,10 +328,13 @@ export default function IssueDetailPage({
 
             {/* Tab switcher */}
             <div className="space-y-4">
-              <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+              <div className="flex gap-1 border-b border-border overflow-x-auto">
                 {(
                   [
-                    { key: "comments", label: `댓글 (${issue.comments?.length ?? 0})` },
+                    {
+                      key: "comments",
+                      label: `댓글 (${issue.comments?.length ?? 0})`,
+                    },
                     { key: "activities", label: "활동" },
                     { key: "all", label: "전체" },
                   ] as { key: TabKey; label: string }[]
@@ -276,11 +342,12 @@ export default function IssueDetailPage({
                   <button
                     key={key}
                     onClick={() => setActiveTab(key)}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                    className={cn(
+                      "px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors cursor-pointer",
                       activeTab === key
-                        ? "border-blue-600 text-blue-600"
-                        : "border-transparent text-gray-600 hover:text-gray-900"
-                    }`}
+                        ? "border-primary text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
                   >
                     {label}
                   </button>
@@ -305,78 +372,84 @@ export default function IssueDetailPage({
                       const replies = repliesByParent.get(c.id) ?? [];
                       return (
                         <div key={c.id} className="space-y-2">
-                          <div className="bg-white p-4 rounded-lg border">
-                            <div className="flex items-center gap-2 mb-2">
-                              <UserAvatar
-                                name={c.author.name}
-                                avatarUrl={c.author.avatarUrl}
-                                size="sm"
-                              />
-                              <span className="text-sm font-medium text-gray-900">
-                                {c.author.name}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {new Date(c.createdAt).toLocaleString("ko-KR")}
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-800 break-words">
-                              <RichEditor
-                                content={c.content}
-                                editable={false}
-                              />
-                            </div>
-                            <div className="mt-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setReplyingTo(
-                                    replyingTo === c.id ? null : c.id
-                                  );
-                                  // 다른 답글 폼 내용이 새로 여는 폼에 새어 들어오는 걸 막는다.
-                                  setReplyContent("");
-                                }}
-                                className="text-xs text-gray-600 hover:text-blue-600"
-                              >
-                                {replyingTo === c.id ? "답글 취소" : "답글"}
-                              </button>
-                            </div>
-                          </div>
+                          <Card>
+                            <CardContent>
+                              <div className="flex items-center gap-2 mb-2">
+                                <UserAvatar
+                                  name={c.author.name}
+                                  avatarUrl={c.author.avatarUrl}
+                                  size="sm"
+                                />
+                                <span className="text-sm font-medium text-foreground">
+                                  {c.author.name}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(c.createdAt).toLocaleString(
+                                    "ko-KR"
+                                  )}
+                                </span>
+                              </div>
+                              <div className="text-sm text-foreground break-words">
+                                <RichEditor
+                                  content={c.content}
+                                  editable={false}
+                                />
+                              </div>
+                              <div className="mt-2">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => {
+                                    setReplyingTo(
+                                      replyingTo === c.id ? null : c.id
+                                    );
+                                    // 다른 답글 폼 내용이 새로 여는 폼에 새어 들어오는 걸 막는다.
+                                    setReplyContent("");
+                                  }}
+                                >
+                                  {replyingTo === c.id ? "답글 취소" : "답글"}
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
 
                           {replies.length > 0 && (
                             <div className="ml-10 space-y-2">
                               {replies.map((r) => (
-                                <div
-                                  key={r.id}
-                                  className="bg-gray-50 p-3 rounded-lg border"
-                                >
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <UserAvatar
-                                      name={r.author.name}
-                                      avatarUrl={r.author.avatarUrl}
-                                      size="xs"
-                                    />
-                                    <span className="text-sm font-medium text-gray-900">
-                                      {r.author.name}
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                      {new Date(r.createdAt).toLocaleString(
-                                        "ko-KR"
-                                      )}
-                                    </span>
-                                  </div>
-                                  <div className="text-sm text-gray-800 break-words">
-                                    <RichEditor
-                                      content={r.content}
-                                      editable={false}
-                                    />
-                                  </div>
-                                </div>
+                                <Card key={r.id} className="bg-muted/40 py-3">
+                                  <CardContent className="px-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <UserAvatar
+                                        name={r.author.name}
+                                        avatarUrl={r.author.avatarUrl}
+                                        size="xs"
+                                      />
+                                      <span className="text-sm font-medium text-foreground">
+                                        {r.author.name}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {new Date(
+                                          r.createdAt
+                                        ).toLocaleString("ko-KR")}
+                                      </span>
+                                    </div>
+                                    <div className="text-sm text-foreground break-words">
+                                      <RichEditor
+                                        content={r.content}
+                                        editable={false}
+                                      />
+                                    </div>
+                                  </CardContent>
+                                </Card>
                               ))}
                             </div>
                           )}
 
                           {replyingTo === c.id && (
                             <form
+                              className="ml-10"
                               onSubmit={(e) => {
                                 e.preventDefault();
                                 if (!isHtmlEmpty(replyContent)) {
@@ -386,35 +459,39 @@ export default function IssueDetailPage({
                                   });
                                 }
                               }}
-                              className="ml-10 bg-white p-3 rounded-lg border"
                             >
-                              <RichEditor
-                                content={replyContent}
-                                onChange={setReplyContent}
-                                placeholder="답글을 입력하세요..."
-                              />
-                              <div className="flex justify-end gap-2 mt-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setReplyingTo(null);
-                                    setReplyContent("");
-                                  }}
-                                  className="px-3 py-1 text-sm text-gray-600"
-                                >
-                                  취소
-                                </button>
-                                <button
-                                  type="submit"
-                                  disabled={
-                                    commentMutation.isPending ||
-                                    isHtmlEmpty(replyContent)
-                                  }
-                                  className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
-                                >
-                                  답글 작성
-                                </button>
-                              </div>
+                              <Card className="py-3">
+                                <CardContent className="px-4">
+                                  <RichEditor
+                                    content={replyContent}
+                                    onChange={setReplyContent}
+                                    placeholder="답글을 입력하세요..."
+                                  />
+                                  <div className="flex justify-end gap-2 mt-2">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setReplyingTo(null);
+                                        setReplyContent("");
+                                      }}
+                                    >
+                                      취소
+                                    </Button>
+                                    <Button
+                                      type="submit"
+                                      size="sm"
+                                      disabled={
+                                        commentMutation.isPending ||
+                                        isHtmlEmpty(replyContent)
+                                      }
+                                    >
+                                      답글 작성
+                                    </Button>
+                                  </div>
+                                </CardContent>
+                              </Card>
                             </form>
                           )}
                         </div>
@@ -422,47 +499,54 @@ export default function IssueDetailPage({
                     });
                   })()}
 
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (!isHtmlEmpty(comment)) {
-                        commentMutation.mutate({ content: comment });
-                      }
-                    }}
-                    className="bg-white p-4 rounded-lg border"
-                  >
-                    <RichEditor
-                      content={comment}
-                      onChange={setComment}
-                      placeholder="댓글을 입력하세요..."
-                    />
-                    <div className="flex justify-end mt-2">
-                      <button
-                        type="submit"
-                        disabled={
-                          commentMutation.isPending || isHtmlEmpty(comment)
-                        }
-                        className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
+                  <Card>
+                    <CardContent>
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (!isHtmlEmpty(comment)) {
+                            commentMutation.mutate({ content: comment });
+                          }
+                        }}
                       >
-                        댓글 작성
-                      </button>
-                    </div>
-                  </form>
+                        <RichEditor
+                          content={comment}
+                          onChange={setComment}
+                          placeholder="댓글을 입력하세요..."
+                        />
+                        <div className="flex justify-end mt-2">
+                          <Button
+                            type="submit"
+                            size="sm"
+                            disabled={
+                              commentMutation.isPending || isHtmlEmpty(comment)
+                            }
+                          >
+                            댓글 작성
+                          </Button>
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
 
               {/* 활동 tab */}
               {activeTab === "activities" && (
-                <div className="bg-white p-4 rounded-lg border">
-                  <ActivityTimeline activities={activitiesData?.activities ?? []} />
-                </div>
+                <Card>
+                  <CardContent>
+                    <ActivityTimeline
+                      activities={activitiesData?.activities ?? []}
+                    />
+                  </CardContent>
+                </Card>
               )}
 
               {/* 전체 tab */}
               {activeTab === "all" && (
                 <div className="space-y-3">
                   {allItems.length === 0 && (
-                    <div className="text-center py-8 text-sm text-gray-500">
+                    <div className="text-center py-8 text-sm text-muted-foreground">
                       내역이 없습니다.
                     </div>
                   )}
@@ -470,36 +554,42 @@ export default function IssueDetailPage({
                     if (item.kind === "comment") {
                       const c = item.data;
                       return (
-                        <div key={`comment-${c.id}`} className="bg-white p-4 rounded-lg border">
-                          <div className="flex items-center gap-2 mb-2">
-                            <UserAvatar
-                              name={c.author.name}
-                              avatarUrl={c.author.avatarUrl}
-                              size="sm"
-                            />
-                            <span className="text-sm font-medium text-gray-900">{c.author.name}</span>
-                            <span className="text-xs text-gray-500">
-                              {c.parentId ? "답글" : "댓글"}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {new Date(c.createdAt).toLocaleString("ko-KR")}
-                            </span>
-                          </div>
-                          <div className="text-sm text-gray-800 break-words">
-                            <RichEditor
-                              content={c.content}
-                              editable={false}
-                            />
-                          </div>
-                        </div>
+                        <Card key={`comment-${c.id}`}>
+                          <CardContent>
+                            <div className="flex items-center gap-2 mb-2">
+                              <UserAvatar
+                                name={c.author.name}
+                                avatarUrl={c.author.avatarUrl}
+                                size="sm"
+                              />
+                              <span className="text-sm font-medium text-foreground">
+                                {c.author.name}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {c.parentId ? "답글" : "댓글"}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(c.createdAt).toLocaleString("ko-KR")}
+                              </span>
+                            </div>
+                            <div className="text-sm text-foreground break-words">
+                              <RichEditor
+                                content={c.content}
+                                editable={false}
+                              />
+                            </div>
+                          </CardContent>
+                        </Card>
                       );
                     }
 
                     const a = item.data;
                     return (
-                      <div key={`activity-${a.id}`} className="bg-white px-4 py-3 rounded-lg border">
-                        <ActivityTimeline activities={[a]} />
-                      </div>
+                      <Card key={`activity-${a.id}`} className="py-3">
+                        <CardContent className="px-4">
+                          <ActivityTimeline activities={[a]} />
+                        </CardContent>
+                      </Card>
                     );
                   })}
                 </div>
@@ -509,114 +599,133 @@ export default function IssueDetailPage({
 
           {/* Sidebar */}
           <div className="space-y-4">
-            <div className="bg-white p-4 rounded-lg border space-y-3">
-              <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">
-                  상태
-                </label>
-                <select
-                  value={issue.status}
-                  onChange={(e) =>
-                    updateMutation.mutate({ status: e.target.value })
-                  }
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-                >
-                  <option value="TODO">할 일</option>
-                  <option value="IN_PROGRESS">진행 중</option>
-                  <option value="IN_REVIEW">리뷰 중</option>
-                  <option value="DONE">완료</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">
-                  우선순위
-                </label>
-                <select
-                  value={issue.priority}
-                  onChange={(e) =>
-                    updateMutation.mutate({ priority: e.target.value })
-                  }
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-                >
-                  <option value="LOW">낮음</option>
-                  <option value="MEDIUM">보통</option>
-                  <option value="HIGH">높음</option>
-                  <option value="CRITICAL">긴급</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">
-                  담당자
-                </label>
-                <select
-                  value={issue.assigneeId ?? ""}
-                  onChange={(e) =>
-                    updateMutation.mutate({
-                      assigneeId: e.target.value || null,
-                    })
-                  }
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-                >
-                  <option value="">미지정</option>
-                  {usersData?.users?.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="pt-2 border-t space-y-2 text-xs text-gray-600">
-                <div className="flex justify-between">
-                  <span>보고자</span>
-                  <span className="text-gray-900">{issue.reporter?.name}</span>
+            <Card>
+              <CardContent className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">상태</Label>
+                  <Select
+                    value={issue.status}
+                    onValueChange={(v) =>
+                      updateMutation.mutate({ status: v })
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="TODO">할 일</SelectItem>
+                      <SelectItem value="IN_PROGRESS">진행 중</SelectItem>
+                      <SelectItem value="IN_REVIEW">리뷰 중</SelectItem>
+                      <SelectItem value="DONE">완료</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="flex justify-between">
-                  <span>생성일</span>
-                  <span className="text-gray-900">
-                    {new Date(issue.createdAt).toLocaleDateString("ko-KR")}
-                  </span>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    우선순위
+                  </Label>
+                  <Select
+                    value={issue.priority}
+                    onValueChange={(v) =>
+                      updateMutation.mutate({ priority: v })
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="LOW">낮음</SelectItem>
+                      <SelectItem value="MEDIUM">보통</SelectItem>
+                      <SelectItem value="HIGH">높음</SelectItem>
+                      <SelectItem value="CRITICAL">긴급</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="flex justify-between">
-                  <span>수정일</span>
-                  <span className="text-gray-900">
-                    {new Date(issue.updatedAt).toLocaleDateString("ko-KR")}
-                  </span>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    담당자
+                  </Label>
+                  <Select
+                    value={issue.assigneeId ?? UNASSIGNED}
+                    onValueChange={(v) =>
+                      updateMutation.mutate({
+                        assigneeId: v === UNASSIGNED ? null : v,
+                      })
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={UNASSIGNED}>미지정</SelectItem>
+                      {usersData?.users?.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                {issue.dueDate && (
+
+                <Separator />
+
+                <div className="space-y-2 text-xs text-muted-foreground">
                   <div className="flex justify-between">
-                    <span>마감일</span>
-                    <span className="text-gray-900">
-                      {new Date(issue.dueDate).toLocaleDateString("ko-KR")}
+                    <span>보고자</span>
+                    <span className="text-foreground">
+                      {issue.reporter?.name}
                     </span>
                   </div>
-                )}
-              </div>
-
-              {issue.labels && issue.labels.length > 0 && (
-                <div className="pt-2 border-t">
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">
-                    라벨
-                  </label>
-                  <div className="flex gap-1 flex-wrap">
-                    {issue.labels.map((label) => (
-                      <span
-                        key={label.id}
-                        className="inline-flex px-2 py-0.5 rounded text-xs"
-                        style={{
-                          backgroundColor: label.color + "20",
-                          color: label.color,
-                        }}
-                      >
-                        {label.name}
-                      </span>
-                    ))}
+                  <div className="flex justify-between">
+                    <span>생성일</span>
+                    <span className="text-foreground">
+                      {new Date(issue.createdAt).toLocaleDateString("ko-KR")}
+                    </span>
                   </div>
+                  <div className="flex justify-between">
+                    <span>수정일</span>
+                    <span className="text-foreground">
+                      {new Date(issue.updatedAt).toLocaleDateString("ko-KR")}
+                    </span>
+                  </div>
+                  {issue.dueDate && (
+                    <div className="flex justify-between">
+                      <span>마감일</span>
+                      <span className="text-foreground">
+                        {new Date(issue.dueDate).toLocaleDateString("ko-KR")}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+
+                {issue.labels && issue.labels.length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">
+                        라벨
+                      </Label>
+                      <div className="flex gap-1 flex-wrap">
+                        {issue.labels.map((label) => (
+                          <span
+                            key={label.id}
+                            className="inline-flex px-2 py-0.5 rounded text-xs"
+                            style={{
+                              backgroundColor: label.color + "20",
+                              color: label.color,
+                            }}
+                          >
+                            {label.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

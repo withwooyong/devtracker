@@ -6,8 +6,23 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/main-layout";
 import { RichEditor } from "@/components/common/rich-editor";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import type { User } from "@/types/user";
-import type { Label } from "@/types/issue";
+import type { Label as IssueLabel } from "@/types/issue";
+
+// Radix Select는 빈 문자열 값을 허용하지 않아 "미지정"용 센티넬이 필요하다.
+const UNASSIGNED = "__unassigned__";
 
 export default function NewIssuePage({
   params,
@@ -21,19 +36,26 @@ export default function NewIssuePage({
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState("TODO");
   const [priority, setPriority] = useState("MEDIUM");
-  const [assigneeId, setAssigneeId] = useState("");
+  const [assigneeId, setAssigneeId] = useState<string>("");
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState("");
 
   const { data: usersData } = useQuery<{ users: User[] }>({
     queryKey: ["users"],
-    queryFn: () => fetch("/api/users").then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
+    queryFn: () =>
+      fetch("/api/users").then((r) => {
+        if (!r.ok) throw new Error("fetch failed");
+        return r.json();
+      }),
   });
 
-  const { data: labelsData } = useQuery<{ labels: Label[] }>({
+  const { data: labelsData } = useQuery<{ labels: IssueLabel[] }>({
     queryKey: ["labels", projectKey],
     queryFn: () =>
-      fetch(`/api/projects/${projectKey}/labels`).then((r) => { if (!r.ok) throw new Error("fetch failed"); return r.json(); }),
+      fetch(`/api/projects/${projectKey}/labels`).then((r) => {
+        if (!r.ok) throw new Error("fetch failed");
+        return r.json();
+      }),
   });
 
   const createMutation = useMutation({
@@ -55,162 +77,159 @@ export default function NewIssuePage({
   return (
     <MainLayout>
       <div className="max-w-3xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">이슈 생성</h1>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl">이슈 생성</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                createMutation.mutate({
+                  title,
+                  description: description || undefined,
+                  status,
+                  priority,
+                  assigneeId: assigneeId || null,
+                  labelIds: selectedLabels,
+                  dueDate: dueDate || null,
+                });
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-1.5">
+                <Label htmlFor="issue-title">제목 *</Label>
+                <Input
+                  id="issue-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                />
+              </div>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            createMutation.mutate({
-              title,
-              description: description || undefined,
-              status,
-              priority,
-              assigneeId: assigneeId || null,
-              labelIds: selectedLabels,
-              dueDate: dueDate || null,
-            });
-          }}
-          className="bg-white p-6 rounded-lg border border-gray-200 space-y-4"
-        >
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              제목 *
-            </label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-              required
-            />
-          </div>
+              <div className="space-y-1.5">
+                <Label>설명</Label>
+                <RichEditor
+                  content={description}
+                  onChange={setDescription}
+                  placeholder="이슈 설명을 입력하세요..."
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              설명
-            </label>
-            <RichEditor
-              content={description}
-              onChange={setDescription}
-              placeholder="이슈 설명을 입력하세요..."
-            />
-          </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label>상태</Label>
+                  <Select value={status} onValueChange={setStatus}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="TODO">할 일</SelectItem>
+                      <SelectItem value="IN_PROGRESS">진행 중</SelectItem>
+                      <SelectItem value="IN_REVIEW">리뷰 중</SelectItem>
+                      <SelectItem value="DONE">완료</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>우선순위</Label>
+                  <Select value={priority} onValueChange={setPriority}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="LOW">낮음</SelectItem>
+                      <SelectItem value="MEDIUM">보통</SelectItem>
+                      <SelectItem value="HIGH">높음</SelectItem>
+                      <SelectItem value="CRITICAL">긴급</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                상태
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-              >
-                <option value="TODO">할 일</option>
-                <option value="IN_PROGRESS">진행 중</option>
-                <option value="IN_REVIEW">리뷰 중</option>
-                <option value="DONE">완료</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                우선순위
-              </label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-              >
-                <option value="LOW">낮음</option>
-                <option value="MEDIUM">보통</option>
-                <option value="HIGH">높음</option>
-                <option value="CRITICAL">긴급</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                담당자
-              </label>
-              <select
-                value={assigneeId}
-                onChange={(e) => setAssigneeId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-              >
-                <option value="">미지정</option>
-                {usersData?.users?.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                마감일
-              </label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-              />
-            </div>
-          </div>
-
-          {labelsData?.labels && labelsData.labels.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                라벨
-              </label>
-              <div className="flex gap-2 flex-wrap">
-                {labelsData.labels.map((label) => (
-                  <button
-                    key={label.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedLabels((prev) =>
-                        prev.includes(label.id)
-                          ? prev.filter((id) => id !== label.id)
-                          : [...prev, label.id]
-                      );
-                    }}
-                    className={`px-3 py-1 rounded-full text-xs border transition-colors ${
-                      selectedLabels.includes(label.id)
-                        ? "border-transparent text-white"
-                        : "border-gray-300 text-gray-600"
-                    }`}
-                    style={
-                      selectedLabels.includes(label.id)
-                        ? { backgroundColor: label.color }
-                        : {}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label>담당자</Label>
+                  <Select
+                    value={assigneeId || UNASSIGNED}
+                    onValueChange={(v) =>
+                      setAssigneeId(v === UNASSIGNED ? "" : v)
                     }
                   >
-                    {label.name}
-                  </button>
-                ))}
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={UNASSIGNED}>미지정</SelectItem>
+                      {usersData?.users?.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="issue-due">마감일</Label>
+                  <Input
+                    id="issue-due"
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                  />
+                </div>
               </div>
-            </div>
-          )}
 
-          <div className="flex gap-2 justify-end pt-2">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              disabled={createMutation.isPending}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-            >
-              {createMutation.isPending ? "생성 중..." : "이슈 생성"}
-            </button>
-          </div>
-        </form>
+              {labelsData?.labels && labelsData.labels.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label>라벨</Label>
+                  <div className="flex gap-2 flex-wrap">
+                    {labelsData.labels.map((label) => {
+                      const selected = selectedLabels.includes(label.id);
+                      return (
+                        <button
+                          key={label.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedLabels((prev) =>
+                              prev.includes(label.id)
+                                ? prev.filter((id) => id !== label.id)
+                                : [...prev, label.id]
+                            );
+                          }}
+                          className={cn(
+                            "px-3 py-1 rounded-full text-xs border transition-colors",
+                            selected
+                              ? "border-transparent text-white"
+                              : "border-input text-muted-foreground hover:bg-accent"
+                          )}
+                          style={
+                            selected ? { backgroundColor: label.color } : {}
+                          }
+                        >
+                          {label.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 justify-end pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => router.back()}
+                >
+                  취소
+                </Button>
+                <Button type="submit" disabled={createMutation.isPending}>
+                  {createMutation.isPending ? "생성 중..." : "이슈 생성"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </MainLayout>
   );
