@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { NotificationDropdown } from "@/components/common/notification-dropdown";
+import { ThemeToggle } from "@/components/common/theme-toggle";
 import { useUIStore } from "@/stores/ui-store";
 
 export function Header() {
@@ -66,7 +67,10 @@ export function Header() {
           ))}
         </nav>
       </div>
-      <NotificationDropdown />
+      <div className="flex items-center gap-1">
+        <ThemeToggle />
+        <NotificationDropdown />
+      </div>
     </header>
   );
 }
