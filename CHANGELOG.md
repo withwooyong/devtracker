@@ -3,6 +3,53 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-24] 청크 3 — 다크모드 토글 + 생명주기 확장 (3-a/b/c/d)
+
+청크 2로 전 페이지 shadcn 토큰화가 끝난 뒤, 남아 있던 4개 후속(다크모드 토글 · AlertDialog · success Button variant · 레이아웃/공통 토큰 치환)을 한 세션에서 모두 마감. 이제 토글 한 번으로 라이트↔다크 전환이 동작하고, 네이티브 `window.confirm()` 잔재가 사라졌으며, 레이아웃/공통 컴포넌트도 토큰 기반으로 정리됨.
+
+### Added
+
+- **next-themes 0.4.6 + ThemeProvider** — `attribute="class"`, `defaultTheme="system"`, `enableSystem`, `disableTransitionOnChange`. Providers 래핑 위치에 배치 → `QueryClientProvider` 바깥. `<html suppressHydrationWarning>`로 SSR/클라이언트 불일치 경고 차단 — `651f9f4`
+- **ThemeToggle 컴포넌트** (`src/components/common/theme-toggle.tsx`) — Sun/Moon 아이콘 rotate+scale 전환. SSR 하이드레이션용 `mounted` state + `useEffect` 가드(ESLint `react-hooks/set-state-in-effect` 규칙은 next-themes 권장 패턴 설명 주석과 함께 인라인 disable). `aria-pressed` + 한글 aria-label. Button `relative` 클래스 추가로 absolute Moon 아이콘 positioning context 확보 — `651f9f4`
+- **Button `success` variant** — `bg-emerald-600 text-white ... dark:bg-emerald-500 dark:hover:bg-emerald-400`. handoff가 제안한 `text-primary-foreground` 대신 `text-white` 채택(primary-foreground가 다크모드에 near-black으로 뒤집히기 때문) — `eb372e1`
+- **AlertDialog 컴포넌트** (`src/components/ui/alert-dialog.tsx`) — 공식 shadcn 소스 11 export. Overlay `bg-black/50`(theme-neutral), Content `bg-background`, Cancel은 outline 변형, Action은 기본 버튼 — `abc3a8a`
+- **@radix-ui/react-alert-dialog** 의존성 추가 — `abc3a8a`
+
+### Changed
+
+- **스프린트 완료 버튼** → `variant="success"` (인라인 `bg-emerald-600 text-white hover:bg-emerald-700` 제거) — `eb372e1`
+- **스프린트 삭제 confirm → AlertDialog** — 트리거는 기존 destructive outline Button 유지, Action에 `variant: destructive` + `disabled={deleteSprint.isPending}` — `abc3a8a`
+- **첨부파일 삭제 confirm → AlertDialog** — 리스트 아이템마다 Dialog(Radix Portal은 open 시만 마운트 → perf 영향 없음). Trigger는 기존 텍스트 스타일 유지, Action에 `disabled={deleteMutation.isPending}` 추가로 중복 DELETE 방지 — `abc3a8a`
+- **header.tsx** — `bg-white border-gray-200` → `bg-background border-border`. 햄버거 버튼/breadcrumb 링크/current label/separator 전부 `text-muted-foreground` · `text-foreground` · `hover:text-foreground`로 토큰화 — `5211ab0`
+- **project-tabs.tsx** — 활성 탭 `text-blue-600 border-blue-600` → `text-primary border-primary`, 비활성 `text-muted-foreground hover:text-foreground` — `5211ab0`
+- **main-layout.tsx** — 페이지 wrapper `bg-gray-50` → `bg-background`(카드가 `bg-card`로 자체 시각 계층 제공). 로딩 스피너 `border-blue-600` → `border-primary` — `5211ab0`
+- **notification-dropdown.tsx** — 트리거 버튼 토큰화(`hover:bg-accent`). 패널 `bg-popover text-popover-foreground border-border`. 읽음 전 행은 `bg-blue-50/60 dark:bg-blue-950/30`(파랑 시맨틱 유지 + `hover:bg-accent`와 구분). 알림 카운트 `bg-red-500 text-white`는 시맨틱으로 유지 — `5211ab0`
+- **attachment-list.tsx** — 컨테이너 `bg-card text-card-foreground border-border`, 드롭존 active `border-primary bg-primary/10`(리뷰 피드백으로 `/5`에서 `/10`으로 상향 — 다크 가시성), idle `hover:border-muted-foreground/50`. 파일 아이콘 `bg-muted text-muted-foreground`, 삭제 버튼 `hover:text-destructive` — `5211ab0`
+
+### a11y
+
+- **AlertDialog title/description** — 시각적 diff보다 의미를 확장: "스프린트를 삭제하시겠습니까? 포함된 이슈는 백로그로 이동됩니다. 이 작업은 되돌릴 수 없습니다." 등 경고 문구 명시 — `abc3a8a`
+- **ThemeToggle aria-pressed** — 리뷰에서 `undefined` pre-mount 지적 → `false`로 고정(토글 의미 일관성) — `651f9f4`
+
+### Decisions
+
+- **sidebar.tsx 스킵** — 원본이 `bg-gray-900 text-white` 항상-다크 디자인. 다크모드에서도 다크 유지가 사용자 기대에 맞고, 변경 시 별도 `--sidebar-*` 토큰 세트가 필요해 범위 초과 → 이번 청크에서 제외
+- **user-avatar.tsx 스킵** — `bg-{red,blue,green,...}-500` 팔레트는 사용자 식별용으로 테마 체크에 흔들리면 안 됨
+- **시맨틱 색 유지** — 알림 카운트 `bg-red-500`(경고), 모달 overlay `bg-black/40/50` 둘 다 의도적 유지
+- **handoff가 예상한 1곳 vs 실제 2곳** — `confirm()` 교체 대상이 스프린트 삭제만 아니라 첨부 삭제에도 있었음. `git grep -n 'confirm('`으로 사전 확인한 덕에 누락 없이 정리
+
+### Reviewer Findings 대응
+
+- **3-a**: HIGH 1(ESLint set-state-in-effect, inline disable + 주석), MEDIUM 2(absolute positioning context 추가, aria-pressed 기본값 조정) — 모두 즉시 수정
+- **3-b**: LOW 1(`dark:hover:bg-emerald-400` + white 대비 약 2:1) — handoff prescribed 패턴이라 유지, 향후 hover emerald-500 또는 600으로 조정 여지 기록
+- **3-c**: MEDIUM 3 — (1) 더블 buttonVariants 클래스 충돌은 `cn()`의 `twMerge`가 자동 해소, (2) 중복 요청 방지는 양쪽 Action에 `disabled={isPending}` 추가, (3) 트리거 a11y는 native `<button disabled>`로 이미 대응
+- **3-d**: MEDIUM 2 — (1) 드롭존 active `bg-primary/5`→`/10`로 상향, (2) 알림 읽음 전 행 `bg-accent/50`→`bg-blue-50/60 dark:bg-blue-950/30` 시맨틱 복원
+
+### 배포
+
+- 이번 세션 커밋 4개(`651f9f4`·`eb372e1`·`abc3a8a`·`5211ab0`)는 이 /handoff 문서 갱신 커밋과 함께 일괄 푸시 → Vercel 자동 배포 1회
+- 프로덕션 URL: https://devtracker-dusky.vercel.app
+
 ## [2026-04-24] 청크 2 — 남은 페이지 shadcn 전환 완료 (2-a + 2-b + 2-c)
 
 5부(청크 1)에 이어 남아 있던 9개 페이지를 3개 청크로 나누어 전부 shadcn 기반으로 전환. 이제 앱의 모든 페이지가 OKLCH 토큰 체계를 사용한다.
