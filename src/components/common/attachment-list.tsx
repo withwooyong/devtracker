@@ -6,6 +6,18 @@ import { toast } from "sonner";
 import type { Attachment } from "@/types/attachment";
 import { MAX_ATTACHMENT_SIZE } from "@/types/attachment";
 import { useAuthStore } from "@/stores/auth-store";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Props {
   projectKey: string;
@@ -198,17 +210,39 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
                     </p>
                   </div>
                   {canDelete && (
-                    <button
-                      onClick={() => {
-                        if (confirm("첨부파일을 삭제하시겠습니까?")) {
-                          deleteMutation.mutate(att.id);
-                        }
-                      }}
-                      disabled={deleteMutation.isPending}
-                      className="text-xs text-gray-400 hover:text-red-600 px-2 disabled:opacity-50"
-                    >
-                      삭제
-                    </button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          type="button"
+                          disabled={deleteMutation.isPending}
+                          className="text-xs text-gray-400 hover:text-red-600 px-2 disabled:opacity-50"
+                        >
+                          삭제
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            첨부파일을 삭제하시겠습니까?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {att.filename} 파일이 영구적으로 삭제됩니다.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>취소</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteMutation.mutate(att.id)}
+                            disabled={deleteMutation.isPending}
+                            className={buttonVariants({
+                              variant: "destructive",
+                            })}
+                          >
+                            삭제
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
                 </li>
               );

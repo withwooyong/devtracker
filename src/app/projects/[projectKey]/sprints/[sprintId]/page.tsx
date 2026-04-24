@@ -9,9 +9,20 @@ import { StatusBadge, PriorityBadge } from "@/components/common/status-badge";
 import { BurndownChart } from "@/components/common/burndown-chart";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   type Sprint,
   type SprintStatus,
@@ -235,22 +246,40 @@ export default function SprintDetailPage({
                         스프린트 완료
                       </Button>
                     )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        if (
-                          confirm(
-                            "스프린트를 삭제하시겠습니까? 포함된 이슈는 백로그로 이동됩니다."
-                          )
-                        ) {
-                          deleteSprint.mutate();
-                        }
-                      }}
-                      className="border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive"
-                    >
-                      삭제
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive"
+                        >
+                          삭제
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            스프린트를 삭제하시겠습니까?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            포함된 이슈는 백로그로 이동됩니다. 이 작업은
+                            되돌릴 수 없습니다.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>취소</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteSprint.mutate()}
+                            disabled={deleteSprint.isPending}
+                            className={buttonVariants({
+                              variant: "destructive",
+                            })}
+                          >
+                            삭제
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
 
