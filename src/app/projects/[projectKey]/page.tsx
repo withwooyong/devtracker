@@ -7,6 +7,33 @@ import { ProjectTabs } from "@/components/layout/project-tabs";
 import { IssueCard } from "@/components/issues/issue-card";
 import Link from "next/link";
 import { StatusBadge, PriorityBadge } from "@/components/common/status-badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ChevronDownIcon, XIcon } from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { useFilterStore } from "@/stores/filter-store";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Issue, IssueStatus, IssuePriority } from "@/types/issue";
@@ -19,20 +46,33 @@ export default function ProjectIssuePage({
   params: Promise<{ projectKey: string }>;
 }) {
   const { projectKey } = use(params);
-  const { status, priority, assigneeId, search, setStatus, setPriority, setAssigneeId, setSearch } =
-    useFilterStore();
+  const {
+    status,
+    priority,
+    assigneeId,
+    search,
+    setStatus,
+    setPriority,
+    setAssigneeId,
+    setSearch,
+  } = useFilterStore();
   const { user: authUser } = useAuthStore();
   const queryClient = useQueryClient();
 
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [filterName, setFilterName] = useState("");
   const [isShared, setIsShared] = useState(false);
-  const [showFiltersDropdown, setShowFiltersDropdown] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const hasActiveFilter =
-    status !== "ALL" || priority !== "ALL" || assigneeId !== "ALL" || search !== "";
+    status !== "ALL" ||
+    priority !== "ALL" ||
+    assigneeId !== "ALL" ||
+    search !== "";
 
-  const { data: projectData } = useQuery<{ project: { id: string; name: string; key: string } }>({
+  const { data: projectData } = useQuery<{
+    project: { id: string; name: string; key: string };
+  }>({
     queryKey: ["project", projectKey],
     queryFn: () =>
       fetch(`/api/projects/${projectKey}`).then((r) => {
@@ -75,7 +115,11 @@ export default function ProjectIssuePage({
   });
 
   const createFilterMutation = useMutation({
-    mutationFn: (payload: { name: string; filters: string; isShared: boolean }) =>
+    mutationFn: (payload: {
+      name: string;
+      filters: string;
+      isShared: boolean;
+    }) =>
       fetch(`/api/projects/${projectKey}/filters`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -89,6 +133,10 @@ export default function ProjectIssuePage({
       setShowSaveForm(false);
       setFilterName("");
       setIsShared(false);
+      toast.success("필터를 저장했습니다.");
+    },
+    onError: () => {
+      toast.error("필터 저장에 실패했습니다.");
     },
   });
 
@@ -103,6 +151,9 @@ export default function ProjectIssuePage({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["savedFilters", projectKey] });
     },
+    onError: () => {
+      toast.error("필터 삭제에 실패했습니다.");
+    },
   });
 
   function handleSaveFilter() {
@@ -113,16 +164,32 @@ export default function ProjectIssuePage({
       assigneeId: assigneeId !== "ALL" ? assigneeId : undefined,
       search: search || undefined,
     });
-    createFilterMutation.mutate({ name: filterName.trim(), filters: filtersJson, isShared });
+    createFilterMutation.mutate({
+      name: filterName.trim(),
+      filters: filtersJson,
+      isShared,
+    });
   }
 
   function handleApplyFilter(f: SavedFilter) {
-    const filters = typeof f.filters === "string" ? JSON.parse(f.filters) : f.filters;
+    let filters: {
+      status?: string;
+      priority?: string;
+      assigneeId?: string;
+      search?: string;
+    };
+    try {
+      filters =
+        typeof f.filters === "string" ? JSON.parse(f.filters) : f.filters;
+    } catch {
+      toast.error("저장된 필터 형식이 올바르지 않습니다.");
+      return;
+    }
     setStatus((filters.status as IssueStatus | undefined) ?? "ALL");
     setPriority((filters.priority as IssuePriority | undefined) ?? "ALL");
     setAssigneeId(filters.assigneeId ?? "ALL");
     setSearch(filters.search ?? "");
-    setShowFiltersDropdown(false);
+    setFiltersOpen(false);
   }
 
   const savedFilters = savedFiltersData?.filters ?? [];
@@ -132,184 +199,234 @@ export default function ProjectIssuePage({
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-6 gap-3">
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-bold text-gray-900 truncate">
+            <h1 className="text-2xl font-bold text-foreground truncate tracking-tight">
               {projectData?.project?.name ?? projectKey}
             </h1>
             <ProjectTabs projectKey={projectKey} />
           </div>
-          <Link
-            href={`/projects/${projectKey}/issues/new`}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-          >
-            이슈 생성
-          </Link>
+          <Button asChild>
+            <Link href={`/projects/${projectKey}/issues/new`}>이슈 생성</Link>
+          </Button>
         </div>
 
         {/* Filters */}
-        <div className="bg-white p-3 rounded-lg border border-gray-200 mb-4 flex flex-col md:flex-row md:items-center gap-2 md:gap-3 md:flex-wrap">
-          {/* Saved filters dropdown */}
-          <div className="relative w-full md:w-auto">
-            <button
-              type="button"
-              onClick={() => setShowFiltersDropdown((v) => !v)}
-              className="w-full md:w-auto px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between md:justify-start gap-1.5"
-            >
-              저장된 필터
-              <svg
-                className="w-3.5 h-3.5 text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {showFiltersDropdown && (
-              <div className="absolute left-0 right-0 md:right-auto top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg md:min-w-48 py-1">
+        <Card className="py-3 mb-4">
+          <CardContent className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 md:flex-wrap">
+            {/* Saved filters popover */}
+            <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full md:w-auto justify-between md:justify-start gap-1.5"
+                >
+                  저장된 필터
+                  <ChevronDownIcon className="size-3.5 opacity-60" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="p-1 w-64">
                 {savedFilters.length === 0 ? (
-                  <p className="px-3 py-2 text-xs text-gray-400">저장된 필터가 없습니다.</p>
+                  <p className="px-3 py-2 text-xs text-muted-foreground">
+                    저장된 필터가 없습니다.
+                  </p>
                 ) : (
                   savedFilters.map((f) => (
                     <div
                       key={f.id}
-                      className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50 group"
+                      className="flex items-center justify-between px-2 py-1 rounded-sm hover:bg-accent group"
                     >
                       <button
                         type="button"
                         onClick={() => handleApplyFilter(f)}
-                        className="flex-1 text-left text-sm text-gray-700 truncate"
+                        className="flex-1 text-left text-sm text-foreground truncate py-0.5"
                       >
                         {f.name}
                         {f.isShared && (
-                          <span className="ml-1.5 text-xs text-blue-500">(공유)</span>
+                          <span className="ml-1.5 text-xs text-primary">
+                            (공유)
+                          </span>
                         )}
                       </button>
                       {f.userId === authUser?.id && (
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteFilterMutation.mutate(f.id);
-                          }}
-                          className="ml-2 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                          onClick={() => deleteFilterMutation.mutate(f.id)}
+                          className="ml-2 text-muted-foreground/50 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
                           aria-label="필터 삭제"
                         >
-                          ×
+                          <XIcon className="size-3.5" />
                         </button>
                       )}
                     </div>
                   ))
                 )}
+              </PopoverContent>
+            </Popover>
+
+            <Input
+              type="text"
+              placeholder="검색..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full md:w-48 h-8"
+            />
+
+            <Select
+              value={status}
+              onValueChange={(v) => setStatus(v as IssueStatus | "ALL")}
+            >
+              <SelectTrigger
+                size="sm"
+                className="w-full md:w-auto min-w-[120px]"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">모든 상태</SelectItem>
+                <SelectItem value="TODO">할 일</SelectItem>
+                <SelectItem value="IN_PROGRESS">진행 중</SelectItem>
+                <SelectItem value="IN_REVIEW">리뷰 중</SelectItem>
+                <SelectItem value="DONE">완료</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={priority}
+              onValueChange={(v) => setPriority(v as IssuePriority | "ALL")}
+            >
+              <SelectTrigger
+                size="sm"
+                className="w-full md:w-auto min-w-[140px]"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">모든 우선순위</SelectItem>
+                <SelectItem value="CRITICAL">긴급</SelectItem>
+                <SelectItem value="HIGH">높음</SelectItem>
+                <SelectItem value="MEDIUM">보통</SelectItem>
+                <SelectItem value="LOW">낮음</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={assigneeId} onValueChange={setAssigneeId}>
+              <SelectTrigger
+                size="sm"
+                className="w-full md:w-auto min-w-[140px]"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">모든 담당자</SelectItem>
+                {usersData?.users?.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Save filter button — only when a filter is active */}
+            {hasActiveFilter && !showSaveForm && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSaveForm(true)}
+                className="w-full md:w-auto border-primary/40 text-primary hover:bg-primary/5"
+              >
+                필터 저장
+              </Button>
+            )}
+
+            {/* Inline save form */}
+            {showSaveForm && (
+              <div className="flex flex-col md:flex-row md:items-center gap-2 md:flex-wrap">
+                <Input
+                  type="text"
+                  placeholder="필터 이름"
+                  value={filterName}
+                  onChange={(e) => setFilterName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSaveFilter();
+                  }}
+                  className="w-full md:w-36 h-8"
+                  autoFocus
+                />
+                <label className="flex items-center gap-1.5 text-sm text-muted-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isShared}
+                    onChange={(e) => setIsShared(e.target.checked)}
+                    className="rounded border-input accent-primary"
+                  />
+                  공유
+                </label>
+                <Button
+                  size="sm"
+                  onClick={handleSaveFilter}
+                  disabled={!filterName.trim() || createFilterMutation.isPending}
+                >
+                  저장
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowSaveForm(false);
+                    setFilterName("");
+                    setIsShared(false);
+                  }}
+                >
+                  취소
+                </Button>
               </div>
             )}
-          </div>
 
-          <input
-            type="text"
-            placeholder="검색..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full md:w-48 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-          />
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as IssueStatus | "ALL")}
-            className="w-full md:w-auto px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-          >
-            <option value="ALL">모든 상태</option>
-            <option value="TODO">할 일</option>
-            <option value="IN_PROGRESS">진행 중</option>
-            <option value="IN_REVIEW">리뷰 중</option>
-            <option value="DONE">완료</option>
-          </select>
-          <select
-            value={priority}
-            onChange={(e) => setPriority(e.target.value as IssuePriority | "ALL")}
-            className="w-full md:w-auto px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-          >
-            <option value="ALL">모든 우선순위</option>
-            <option value="CRITICAL">긴급</option>
-            <option value="HIGH">높음</option>
-            <option value="MEDIUM">보통</option>
-            <option value="LOW">낮음</option>
-          </select>
-          <select
-            value={assigneeId}
-            onChange={(e) => setAssigneeId(e.target.value)}
-            className="w-full md:w-auto px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-          >
-            <option value="ALL">모든 담당자</option>
-            {usersData?.users?.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Save filter button — only when a filter is active */}
-          {hasActiveFilter && !showSaveForm && (
-            <button
-              type="button"
-              onClick={() => setShowSaveForm(true)}
-              className="w-full md:w-auto px-3 py-1.5 border border-blue-300 text-blue-600 rounded-lg text-sm hover:bg-blue-50 transition-colors"
-            >
-              필터 저장
-            </button>
-          )}
-
-          {/* Inline save form */}
-          {showSaveForm && (
-            <div className="flex flex-col md:flex-row md:items-center gap-2 md:flex-wrap">
-              <input
-                type="text"
-                placeholder="필터 이름"
-                value={filterName}
-                onChange={(e) => setFilterName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSaveFilter(); }}
-                className="w-full md:w-36 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-                autoFocus
-              />
-              <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={isShared}
-                  onChange={(e) => setIsShared(e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                공유
-              </label>
-              <button
-                type="button"
-                onClick={handleSaveFilter}
-                disabled={!filterName.trim() || createFilterMutation.isPending}
-                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                저장
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowSaveForm(false); setFilterName(""); setIsShared(false); }}
-                className="px-3 py-1.5 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-              >
-                취소
-              </button>
-            </div>
-          )}
-
-          <span className="text-xs text-gray-500 md:ml-auto">
-            총 {data?.total ?? 0}개
-          </span>
-        </div>
+            <span className="text-xs text-muted-foreground md:ml-auto">
+              총 {data?.total ?? 0}개
+            </span>
+          </CardContent>
+        </Card>
 
         {/* Issue list */}
         {isLoading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-          </div>
+          <>
+            <div className="md:hidden space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="py-3">
+                  <CardContent className="space-y-2 px-3">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <div className="hidden md:block">
+              <Card className="py-0">
+                <div className="space-y-0 divide-y divide-border">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-4 px-4 py-3"
+                    >
+                      <Skeleton className="h-4 w-12" />
+                      <Skeleton className="h-4 flex-1" />
+                      <Skeleton className="h-5 w-16" />
+                      <Skeleton className="h-5 w-16" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          </>
         ) : !data?.issues || data.issues.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 px-4 py-12 text-center text-gray-500 text-sm">
-            이슈가 없습니다.
-          </div>
+          <Card className="py-12">
+            <CardContent className="text-center text-muted-foreground text-sm">
+              이슈가 없습니다.
+            </CardContent>
+          </Card>
         ) : (
           <>
             {/* Mobile card list */}
@@ -324,40 +441,45 @@ export default function ProjectIssuePage({
             </div>
 
             {/* Desktop table */}
-            <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b text-left text-xs font-medium text-gray-500 uppercase">
-                    <th className="px-4 py-3 w-16">#</th>
-                    <th className="px-4 py-3">제목</th>
-                    <th className="px-4 py-3 w-24">상태</th>
-                    <th className="px-4 py-3 w-24">우선순위</th>
-                    <th className="px-4 py-3 w-28">담당자</th>
-                    <th className="px-4 py-3 w-28">생성일</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <Card className="hidden md:block py-0 overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="w-16 uppercase text-xs">#</TableHead>
+                    <TableHead className="uppercase text-xs">제목</TableHead>
+                    <TableHead className="w-24 uppercase text-xs">상태</TableHead>
+                    <TableHead className="w-24 uppercase text-xs">
+                      우선순위
+                    </TableHead>
+                    <TableHead className="w-28 uppercase text-xs">
+                      담당자
+                    </TableHead>
+                    <TableHead className="w-28 uppercase text-xs">
+                      생성일
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {data.issues.map((issue) => (
-                    <tr
-                      key={issue.id}
-                      className="border-b last:border-b-0 hover:bg-gray-50"
-                    >
-                      <td className="px-4 py-3 text-sm text-gray-500">
+                    <TableRow key={issue.id} className="group">
+                      <TableCell className="text-sm text-muted-foreground font-mono">
                         {projectKey}-{issue.issueNumber}
-                      </td>
-                      <td className="px-4 py-3">
+                      </TableCell>
+                      <TableCell className="whitespace-normal">
                         <Link
                           href={`/projects/${projectKey}/issues/${issue.issueNumber}`}
-                          className="text-sm font-medium text-gray-900 hover:text-blue-600"
+                          className="text-sm font-medium text-foreground group-hover:text-primary transition-colors"
                         >
                           {issue.title}
                         </Link>
                         {issue.labels && issue.labels.length > 0 && (
-                          <div className="flex gap-1 mt-1">
+                          <div className="flex gap-1 mt-1 flex-wrap">
                             {issue.labels.map((label) => (
                               <span
                                 key={label.id}
-                                className="inline-flex px-1.5 py-0.5 rounded text-xs"
+                                className={cn(
+                                  "inline-flex px-1.5 py-0.5 rounded text-xs"
+                                )}
                                 style={{
                                   backgroundColor: label.color + "20",
                                   color: label.color,
@@ -368,24 +490,24 @@ export default function ProjectIssuePage({
                             ))}
                           </div>
                         )}
-                      </td>
-                      <td className="px-4 py-3">
+                      </TableCell>
+                      <TableCell>
                         <StatusBadge status={issue.status} />
-                      </td>
-                      <td className="px-4 py-3">
+                      </TableCell>
+                      <TableCell>
                         <PriorityBadge priority={issue.priority} />
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
                         {issue.assignee?.name ?? "-"}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
                         {new Date(issue.createdAt).toLocaleDateString("ko-KR")}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+              </Table>
+            </Card>
           </>
         )}
       </div>
