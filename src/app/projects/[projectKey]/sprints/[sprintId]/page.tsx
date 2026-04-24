@@ -227,10 +227,10 @@ export default function SprintDetailPage({
                     {sprint.status === "ACTIVE" && (
                       <Button
                         size="sm"
+                        variant="success"
                         onClick={() =>
                           updateSprint.mutate({ status: "COMPLETED" })
                         }
-                        className="bg-emerald-600 text-white hover:bg-emerald-700"
                       >
                         스프린트 완료
                       </Button>
