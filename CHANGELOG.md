@@ -3,6 +3,54 @@
 All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/).
 
+## [2026-04-24] 청크 2 — 남은 페이지 shadcn 전환 완료 (2-a + 2-b + 2-c)
+
+5부(청크 1)에 이어 남아 있던 9개 페이지를 3개 청크로 나누어 전부 shadcn 기반으로 전환. 이제 앱의 모든 페이지가 OKLCH 토큰 체계를 사용한다.
+
+### Added
+- **ui 컴포넌트 3종 추가** — `Popover`(`@radix-ui/react-popover` 1.1.15), `Table`, 그리고 Textarea는 5부에서 추가됐지만 이번 청크부터 본격 사용(배포 변경사항/스프린트 목표) — `79a3b50`
+- **`SPRINT_STATUS_VARIANT` 매핑(2-c)** — `src/app/projects/[projectKey]/sprints/page.tsx` + `sprints/[sprintId]/page.tsx`에 모듈 스코프 `Record<SprintStatus, BadgeVariant>` 도입(PLANNED=slate, ACTIVE=blue, COMPLETED=emerald). 기존 하드코딩 `SPRINT_STATUS_COLORS`를 shadcn Badge variant 체계에 통합(types/sprint.ts의 상수 자체는 다른 곳 호출 대비 남겨둠) — `b9d8368`
+- **filter create/delete mutation 토스트 배선** — 이전까지 `onError` 누락이었던 `createFilterMutation`/`deleteFilterMutation`에 sonner 토스트 추가. 성공 시 "필터를 저장했습니다" 토스트도 추가 — `79a3b50`
+- **배포 생성 토스트** — `createMutation.onSuccess/onError`로 배포 기록 성공/실패 토스트 — `b9d8368`
+- **deployments 쿼리 `r.ok` 체크** — 리팩토링 과정에서 원본의 `r.ok` 누락 발견 → 추가 — `b9d8368`
+
+### Changed
+- **대시보드(2-a, `dashboard/page.tsx`)** — 프로젝트 카드 그리드를 Card + `hover:-translate-y-0.5` 리프트, 키 박스는 `bg-primary/10 text-primary`. Skeleton 그리드 6개로 로딩 플레이스홀더. 빈 상태 Card + `Button asChild + Link`로 CTA — `79a3b50`
+- **프로젝트 목록(2-a, `projects/page.tsx`)** — 새 프로젝트 폼 Card + Input + Label(htmlFor 연결) + Button. 리스트 Card hover, Skeleton 3개 로딩 — `79a3b50`
+- **프로젝트 메인(2-a, `projects/[projectKey]/page.tsx`, 최대 변경)** — 필터 바 Card화. **저장된 필터 커스텀 드롭다운 → shadcn Popover**로 교체(Radix의 pointer-down 기반 outside-click 자동 처리로 **B안 묶음 2 자연 해소**). Select 3개(상태/우선순위/담당자) — `ALL` 값은 non-empty이므로 Radix 제약 OK. 검색은 Input. 데스크톱 이슈 리스트는 shadcn Table, 모바일은 Card 기반 IssueCard. 필터 JSON.parse try/catch + 형식 오류 토스트 — `79a3b50`
+- **IssueCard(2-a, `components/issues/issue-card.tsx`)** — 전체 카드 Link 래핑 유지. Card + Badge(#prefix 표시) + group hover 색상 전환 — `79a3b50`
+- **로그인(2-b, `login/page.tsx`)** — standalone 유지(`min-h-screen bg-muted/30`), Card + Separator + Input/Label/Button. 인라인 에러 `role="alert"` + `bg-destructive/10 border-destructive/30`. 로그인/회원가입 모드 토글 `Button variant="link"`. 테스트 계정 안내 `bg-muted/50` 박스 — `010f491`
+- **전역 설정(2-b, `settings/page.tsx`)** — Card + Input + Label + Button. 이메일/이름 `disabled readOnly`(React controlled-input 경고 방지). 로딩 Skeleton 라인 4개. 취소 `Button asChild + Link /dashboard` — `010f491`
+- **프로젝트 설정(2-b, `projects/[projectKey]/settings/page.tsx`)** — Card + Textarea(설명) + Input(repo) + Input password(secret). **webhook 상태 Badge**(variant=emerald/slate). 제거/제거 취소 `Button variant="link"` + `focus-visible:ring-offset-2`(ring 잘림 방지). 권한 없음 amber Card 패널(라이트/다크 대응). 로딩 Skeleton — `010f491`
+- **배포 목록(2-c, `deployments/page.tsx`)** — 배포 카드 Card, 버전 `font-mono`. env 필터(ALL/DEV/STAGING/PROD)를 Button size="sm"(default/outline 토글)로. 변경사항 `<details>`는 유지하되 pre 배경 `bg-muted/50`로 토큰화. Skeleton 3개, 빈 상태 Card — `b9d8368`
+- **배포 신규(2-c, `deployments/new/page.tsx`)** — Card + Input + Select(환경) + Textarea(Markdown 변경사항). Label htmlFor="deploy-env" ↔ SelectTrigger id 연결 — `b9d8368`
+- **스프린트 목록(2-c, `sprints/page.tsx`)** — Card hover + Badge `rounded-full` pill. Skeleton 4개 그리드 — `b9d8368`
+- **스프린트 신규(2-c, `sprints/new/page.tsx`)** — Card + Input + Textarea + 날짜 Input. 에러 `role="alert"` + destructive 토큰 — `b9d8368`
+- **스프린트 상세(2-c, `sprints/[sprintId]/page.tsx`, 356줄)** — 메타 Card(이름 + Badge + 기간 + goal). 상태 전환 버튼(시작/완료/삭제) Button size="sm". 완료 버튼은 `bg-emerald-600 hover:bg-emerald-700` 인라인(variant 없음, 다크모드 대응은 후속). 진행률 바 `bg-muted`/`bg-primary` 토큰. BurndownChart 유지. 이슈/백로그 리스트 Card + Separator로 섹션 구분. 백로그 영역 `bg-muted/30`. "제거" Button variant="ghost" — `b9d8368`
+
+### Fixed
+- **webhook secret 제거 취소 silent drop 버그(2-b, `project-settings`)** — 사용자가 secret 입력 → "제거" 클릭 → "제거 취소" 클릭 시, `webhookSecret` state에 입력값이 남아 있지만 action은 `null`이 되어 저장 시 해당 값이 사라지던 문제. "제거 취소" 핸들러에서 `setWebhookSecret("")` 추가로 input과 state를 함께 비움 — `010f491`
+- **JSON.parse 런타임 크래시 가능성(2-a, `projects/[projectKey]/page.tsx`)** — 저장된 필터 적용 시 `f.filters`가 서버에서 문자열로 올 경우를 대비한 `JSON.parse` 호출에 try/catch 없었음 → 형식 오류 시 토스트 + 조기 반환 — `79a3b50`
+
+### a11y
+- **비밀번호 placeholder(2-b)** — 로그인 페이지 `••••••`(스크린리더가 "bullet bullet..." 낭독) → "비밀번호 입력" — `010f491`
+- **Select htmlFor(2-c)** — 배포 신규의 "환경" Label이 Select와 연결 안 돼 있던 문제 수정(Label htmlFor + SelectTrigger id) — `b9d8368`
+- **Popover delete 버튼 stopPropagation(2-a)** — Radix는 pointerdown 기반이라 click의 `stopPropagation`이 무효 → 제거. 필터 삭제 후 Popover가 유지되는 동작은 여러 필터 정리에 편리해서 의도적으로 유지 — `79a3b50`
+
+### 배포
+- `79a3b50` 2-a → Vercel 자동 배포 트리거
+- `010f491` 2-b → Vercel 자동 배포 트리거
+- `b9d8368` 2-c → Vercel 자동 배포 트리거
+- 세 커밋 모두 `origin/main` 반영 완료
+
+### 남은 후속 (다음 세션)
+- 다크모드 토글 UI(`next-themes` + 헤더 토글) — 토큰 준비 완료, UI만 남음
+- AlertDialog로 `window.confirm()` 교체(스프린트 삭제 등)
+- "스프린트 완료" 버튼 하드코딩 `bg-emerald-600` → success Button variant로
+- `components/layout/*` · `components/common/*` 토큰 치환(영향도 낮음, 보류 가능)
+
+---
+
 ## [2026-04-23] 5부 — shadcn/ui 도입 + 칸반 감성 효과 + 이슈 상세/생성 shadcn 전환
 
 ### Added
