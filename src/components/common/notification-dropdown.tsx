@@ -81,7 +81,7 @@ export function NotificationDropdown() {
           setOpen((v) => !v);
         }}
         aria-label="알림"
-        className="relative p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+        className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent"
       >
         <svg
           className="w-5 h-5"
@@ -104,13 +104,13 @@ export function NotificationDropdown() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-30">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 sticky top-0 bg-white">
-            <span className="text-sm font-medium text-gray-800">알림</span>
+        <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-30">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-border sticky top-0 bg-popover">
+            <span className="text-sm font-medium text-foreground">알림</span>
             {unreadCount > 0 && (
               <button
                 onClick={() => markRead.mutate({ markAll: true })}
-                className="text-xs text-blue-600 hover:underline"
+                className="text-xs text-primary hover:underline"
               >
                 모두 읽음
               </button>
@@ -118,7 +118,7 @@ export function NotificationDropdown() {
           </div>
 
           {notifications.length === 0 ? (
-            <p className="p-6 text-center text-xs text-gray-400">
+            <p className="p-6 text-center text-xs text-muted-foreground">
               새 알림이 없습니다.
             </p>
           ) : (
@@ -126,8 +126,8 @@ export function NotificationDropdown() {
               {notifications.map((n) => (
                 <li
                   key={n.id}
-                  className={`border-b border-gray-50 last:border-0 ${
-                    n.isRead ? "bg-white" : "bg-blue-50/40"
+                  className={`border-b border-border last:border-0 ${
+                    n.isRead ? "" : "bg-blue-50/60 dark:bg-blue-950/30"
                   }`}
                 >
                   <Link
@@ -136,22 +136,22 @@ export function NotificationDropdown() {
                       if (!n.isRead) markRead.mutate({ ids: [n.id] });
                       setOpen(false);
                     }}
-                    className="block px-4 py-2.5 hover:bg-gray-50"
+                    className="block px-4 py-2.5 hover:bg-accent"
                   >
                     <div className="flex gap-2">
                       <span aria-hidden className="text-base leading-none">
                         {NOTIFICATION_TYPE_ICONS[n.type] ?? "🔔"}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900 truncate">
+                        <p className="text-sm text-foreground truncate">
                           {n.title}
                         </p>
                         {n.message && (
-                          <p className="text-xs text-gray-500 truncate mt-0.5">
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">
                             {n.message}
                           </p>
                         )}
-                        <p className="text-[11px] text-gray-400 mt-1">
+                        <p className="text-[11px] text-muted-foreground mt-1">
                           {timeAgo(n.createdAt)}
                         </p>
                       </div>

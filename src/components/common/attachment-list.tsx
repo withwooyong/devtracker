@@ -113,11 +113,11 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
   const attachments = data?.attachments ?? [];
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-800">
+    <div className="bg-card text-card-foreground border border-border rounded-lg">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
+        <h3 className="text-sm font-semibold text-foreground">
           첨부파일{" "}
-          <span className="text-gray-400 font-normal">
+          <span className="text-muted-foreground font-normal">
             ({attachments.length})
           </span>
         </h3>
@@ -136,8 +136,8 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
         }}
         className={`m-4 border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
           dragOver
-            ? "border-blue-400 bg-blue-50"
-            : "border-gray-200 hover:border-gray-300"
+            ? "border-primary bg-primary/10"
+            : "border-border hover:border-muted-foreground/50"
         }`}
       >
         <input
@@ -149,31 +149,31 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
             if (inputRef.current) inputRef.current.value = "";
           }}
         />
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-foreground">
           파일을 여기에 놓거나{" "}
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="text-blue-600 hover:underline font-medium"
+            className="text-primary hover:underline font-medium"
           >
             클릭하여 선택
           </button>
         </p>
-        <p className="text-xs text-gray-400 mt-1">최대 4MB</p>
+        <p className="text-xs text-muted-foreground mt-1">최대 4MB</p>
         {uploadMutation.isPending && (
-          <p className="text-xs text-blue-600 mt-2">업로드 중…</p>
+          <p className="text-xs text-primary mt-2">업로드 중…</p>
         )}
       </div>
 
       <div className="px-4 pb-4">
         {isLoading ? (
-          <p className="text-xs text-gray-400 py-2">불러오는 중…</p>
+          <p className="text-xs text-muted-foreground py-2">불러오는 중…</p>
         ) : attachments.length === 0 ? (
-          <p className="text-xs text-gray-400 py-2 text-center">
+          <p className="text-xs text-muted-foreground py-2 text-center">
             첨부된 파일이 없습니다.
           </p>
         ) : (
-          <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
+          <ul className="divide-y divide-border border border-border rounded-lg">
             {attachments.map((att) => {
               const canDelete =
                 user?.id === att.userId || user?.role === "ADMIN";
@@ -188,10 +188,10 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
                     <img
                       src={downloadUrl}
                       alt={att.filename}
-                      className="w-10 h-10 object-cover rounded border border-gray-200"
+                      className="w-10 h-10 object-cover rounded border border-border"
                     />
                   ) : (
-                    <div className="w-10 h-10 flex items-center justify-center rounded bg-gray-100 text-gray-500 text-xs">
+                    <div className="w-10 h-10 flex items-center justify-center rounded bg-muted text-muted-foreground text-xs">
                       📎
                     </div>
                   )}
@@ -200,11 +200,11 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
                       href={downloadUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-gray-900 hover:text-blue-600 truncate block"
+                      className="text-sm text-foreground hover:text-primary truncate block"
                     >
                       {att.filename}
                     </a>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-muted-foreground">
                       {formatSize(att.size)}
                       {att.user?.name ? ` · ${att.user.name}` : ""}
                     </p>
@@ -215,7 +215,7 @@ export function AttachmentList({ projectKey, issueNumber, issueId }: Props) {
                         <button
                           type="button"
                           disabled={deleteMutation.isPending}
-                          className="text-xs text-gray-400 hover:text-red-600 px-2 disabled:opacity-50"
+                          className="text-xs text-muted-foreground hover:text-destructive px-2 disabled:opacity-50"
                         >
                           삭제
                         </button>

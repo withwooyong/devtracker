@@ -19,13 +19,13 @@ export function Header() {
     }));
 
   return (
-    <header className="h-14 border-b border-gray-200 bg-white px-4 md:px-6 flex items-center justify-between gap-2">
+    <header className="h-14 border-b border-border bg-background px-4 md:px-6 flex items-center justify-between gap-2">
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <button
           type="button"
           onClick={openSidebar}
           data-sidebar-trigger
-          className="lg:hidden p-2 -ml-2 text-gray-600 hover:text-gray-900"
+          className="lg:hidden p-2 -ml-2 text-muted-foreground hover:text-foreground"
           aria-label="사이드바 열기"
         >
           <svg
@@ -42,7 +42,7 @@ export function Header() {
             />
           </svg>
         </button>
-        <nav className="flex items-center gap-2 text-sm text-gray-500 min-w-0 overflow-hidden">
+        <nav className="flex items-center gap-2 text-sm text-muted-foreground min-w-0 overflow-hidden">
           {breadcrumbs.map((crumb, i) => (
             <span
               key={crumb.href}
@@ -50,15 +50,15 @@ export function Header() {
                 i === breadcrumbs.length - 1 ? "min-w-0" : "hidden sm:flex"
               }`}
             >
-              {i > 0 && <span className="text-gray-400">/</span>}
+              {i > 0 && <span className="text-muted-foreground/60">/</span>}
               {i === breadcrumbs.length - 1 ? (
-                <span className="text-gray-900 font-medium truncate">
+                <span className="text-foreground font-medium truncate">
                   {crumb.label}
                 </span>
               ) : (
                 <Link
                   href={crumb.href}
-                  className="hover:text-gray-700 truncate max-w-[10rem]"
+                  className="hover:text-foreground truncate max-w-[10rem]"
                 >
                   {crumb.label}
                 </Link>

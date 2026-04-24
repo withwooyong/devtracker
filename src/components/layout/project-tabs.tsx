@@ -40,8 +40,8 @@ export function ProjectTabs({ projectKey }: { projectKey: string }) {
             aria-current={active ? "page" : undefined}
             className={`whitespace-nowrap pb-1 ${
               active
-                ? "text-blue-600 font-medium border-b-2 border-blue-600"
-                : "text-gray-500 hover:text-gray-700"
+                ? "text-primary font-medium border-b-2 border-primary"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {tab.label}
